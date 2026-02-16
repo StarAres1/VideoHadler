@@ -1,6 +1,5 @@
-from CameraManager import CameraManager
+from app.core.CameraManager import CameraManager
 import threading
-import time
 
 number = 0
 

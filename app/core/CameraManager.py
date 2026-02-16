@@ -1,6 +1,5 @@
-import cv2
 from pygrabber.dshow_graph import FilterGraph
-from Camera import Camera
+from app.core.Camera import Camera
 class CameraManager:
     def __init__(self):
         self.connected_cameras = []
