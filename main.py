@@ -1,32 +1,33 @@
 from app.core.CameraManager import CameraManager
+from forms.main_window_ui import Ui_MainWindow
 import threading
-
-number = 0
+import sys
+from PyQt5.QtWidgets import QMainWindow, QApplication
 
 if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    MainWindow = QMainWindow()
+    ui = Ui_MainWindow()
+    ui.setupUi(MainWindow)
+
+    # поиск доступных камер сразу после включения приложения
     cameraManager = CameraManager()
-    cameraManager.find_cameras()
+    cameraManager.find_cameras(ui.c_list_cameras)
 
-    connected_camera = cameraManager.connected_cameras
-    print(connected_camera)
+    # обновление списка доступных камер
+    ui.bt_update_cameras.clicked.connect(lambda: cameraManager.find_cameras(ui.c_list_cameras))
 
-    camera1 = cameraManager.create_camera(connected_camera[number]["index"], connected_camera[number]["name"])
-    camera1.capture_video()
+    # подключение к выбранной камере
+    ui.bt_open_camera.clicked.connect(
+        lambda: ui.c_list_cameras.currentData().connect())
+
+    # начать вывод изображения на монитор
+    ui.bt_start_grabling.clicked.connect(lambda: ui.c_list_cameras.currentData().capture_video(ui.videoFrame))
+
+    # завершить захват кадров
+    ui.bt_stop_grabling.clicked.connect(lambda: ui.c_list_cameras.currentData().stop_capture())
 
 
-
-# Для многопоточной обработки
-""" 
-
-    camera1 = cameraManager.create_camera(connected_camera[number]["index"], connected_camera[number]["name"])
-    camera2 = cameraManager.create_camera(connected_camera[1]["index"], connected_camera[1]["name"])
-    
-    t1 = threading.Thread(target=camera1.capture_video)
-    t2 = threading.Thread(target=camera2.capture_video)
-
-    t1.start()
-    t2.start()
-
-    t1.join()
-    t2.join()
-"""
+    MainWindow.show()
+    sys.exit(app.exec_())

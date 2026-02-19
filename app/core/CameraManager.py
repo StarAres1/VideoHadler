@@ -4,16 +4,14 @@ class CameraManager:
     def __init__(self):
         self.connected_cameras = []
 
-    def find_cameras(self):
+    def find_cameras(self, gui_list):
+        gui_list.clear()
+
         graph = FilterGraph()
         devices = graph.get_input_devices()
 
         for i in range(len(devices)):
-            info = {
-                'index': i,
-                'name': devices[i]
-            }
-            self.connected_cameras.append(info)
+            gui_list.addItem(f"{i}: {devices[i]}", self.create_camera(i, devices[i]))
 
     def create_camera(self, index, name):
         return Camera(index, name)

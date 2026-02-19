@@ -1,5 +1,7 @@
 import cv2
 from datetime import datetime
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import Qt
 
 class Camera:
     def __init__(self, index, name):
@@ -7,13 +9,13 @@ class Camera:
         self.index = index
         self.name = name
         self.flag_record = False
+        self.flag_capture = False
         self.fourcc = None
         self.width = None
         self.height = None
+        self.channel = None
         self.output = None
         self.fps = None
-
-        self.connect()
 
     def connect(self):
         self.cap = cv2.VideoCapture(self.index)
@@ -27,7 +29,9 @@ class Camera:
         self.cap.release()
 
 
-    def capture_video(self):
+    def capture_video(self, video_frame):
+
+        self.flag_capture = True
 
         if not self.get_property():
             return False
@@ -35,16 +39,22 @@ class Camera:
         # Следующая строка временно!!!! До момента создания GUI
         self.start_record()
         try:
-            while True:
-                ret, frame = self.cap.read()
+            while self.flag_capture:
+                ret, bgr_frame = self.cap.read()
 
                 if not ret:
                     continue
 
+                frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
+                bytes_per_line = self.channel * self.width
+
+                q_image = QImage(frame.data, self.width, self.height, bytes_per_line, QImage.Format_RGB888)
+
+                pixmap = QPixmap.fromImage(q_image)
+                video_frame.setPixmap(pixmap)
+
                 if self.flag_record:
                     self.write_video(frame)
-
-                cv2.imshow(self.name, frame)
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
@@ -86,11 +96,10 @@ class Camera:
         if not ret:
             return False
 
-        self.height, self.width, channel = frame.shape
-        print("channel: ", channel)
+        self.height, self.width, self.channel = frame.shape
 
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        print("fps: ", self.fps)
-
-        print("Свойства получены")
         return True
+
+    def stop_capture(self):
+        self.flag_capture = False
