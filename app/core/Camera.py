@@ -17,10 +17,6 @@ class Camera:
         self.output = None
         self.fps = None
 
-    def connect(self):
-        self.cap = cv2.VideoCapture(self.index)
-        return self.cap.isOpened()
-
 
     def disconnect(self):
         if self.flag_record:
@@ -29,23 +25,25 @@ class Camera:
         self.cap.release()
 
 
-    def capture_video(self, video_frame):
+    def start_capture(self, video_frame):
 
         self.flag_capture = True
+
+        self.cap = cv2.VideoCapture(self.index)
 
         if not self.get_property():
             return False
 
-        # Следующая строка временно!!!! До момента создания GUI
-        self.start_record()
         try:
             while self.flag_capture:
-                ret, bgr_frame = self.cap.read()
+                ret, rgb_frame = self.cap.read()
 
                 if not ret:
                     continue
 
-                frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
+                rgb_frame = cv2.flip(rgb_frame, 1)
+
+                frame = cv2.cvtColor(rgb_frame, cv2.COLOR_BGR2RGB)
                 bytes_per_line = self.channel * self.width
 
                 q_image = QImage(frame.data, self.width, self.height, bytes_per_line, QImage.Format_RGB888)
@@ -54,10 +52,12 @@ class Camera:
                 video_frame.setPixmap(pixmap)
 
                 if self.flag_record:
-                    self.write_video(frame)
+                    self.write_video(rgb_frame)
 
+                # эта волшебная строчка помогает нам ВРЕМЕННО обойтись без многопоточки
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
+
         except Exception as e:
             print(e)
         finally:
