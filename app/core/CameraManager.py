@@ -1,8 +1,9 @@
 from pygrabber.dshow_graph import FilterGraph
 from app.core.Camera import Camera
 class CameraManager:
-    def __init__(self):
-        self.connected_cameras = []
+    def __init__(self, video_frame):
+        self.cameras = []
+        self.video_frame = video_frame
 
     def find_cameras(self, gui_list):
         gui_list.clear()
@@ -11,7 +12,8 @@ class CameraManager:
         devices = graph.get_input_devices()
 
         for i in range(len(devices)):
-            gui_list.addItem(f"{i}: {devices[i]}", self.create_camera(i, devices[i]))
+            self.cameras.append(self.create_camera(i, devices[i]))
+            gui_list.addItem(f"{i}: {devices[i]}")
 
     def create_camera(self, index, name):
-        return Camera(index, name)
+        return Camera(index, name, self.video_frame)
