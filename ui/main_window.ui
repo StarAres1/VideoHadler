@@ -6,90 +6,132 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>911</width>
-    <height>686</height>
+    <width>1013</width>
+    <height>784</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout">
-    <item row="1" column="1">
-     <widget class="QGroupBox" name="group_contrast_enhancement">
-      <property name="title">
-       <string>Настройки улучшения контраста</string>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_3">
-       <item row="0" column="0">
-        <widget class="QLabel" name="label">
-         <property name="text">
-          <string> Пока ничего</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="0" column="0" rowspan="2">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
      <widget class="QLabel" name="videoFrame">
+      <property name="autoFillBackground">
+       <bool>false</bool>
+      </property>
       <property name="text">
-       <string/>
+       <string>DFHDSJHFKLDSHFKLJDSHFKLJDHSFJKLDHSFKLJADHSFJKDHSJKFHADSJKFHADSJKFHDSKLJFHADSKLJHFADSJKFHDSJKLDJSAF</string>
       </property>
      </widget>
     </item>
-    <item row="0" column="1">
-     <widget class="QGroupBox" name="group_grabling_video">
-      <property name="title">
-       <string>Настройки захвата кадра с камеры</string>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
       </property>
-      <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="0">
-        <widget class="QLabel" name="l_list_cameras">
-         <property name="text">
-          <string>Доступные камеры:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QPushButton" name="bt_start_record">
-         <property name="text">
-          <string>Запись в файл</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QPushButton" name="bt_start_capture">
-         <property name="text">
-          <string>Начать захват кадров</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QComboBox" name="c_list_cameras"/>
-       </item>
-       <item row="3" column="1">
-        <widget class="QPushButton" name="bt_stop_record">
-         <property name="text">
-          <string>Завершить запись</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QPushButton" name="bt_update_cameras">
-         <property name="text">
-          <string>Обновить список камер</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QPushButton" name="bt_stop_capture">
-         <property name="text">
-          <string>Завершить захват кадров</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
+      <widget class="QWidget" name="tab_camera">
+       <attribute name="title">
+        <string>Камера</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <widget class="QGroupBox" name="group_grabling_video">
+          <property name="title">
+           <string>Настройки захвата кадров с камеры</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_2">
+           <item row="3" column="0">
+            <widget class="QPushButton" name="bt_start_record">
+             <property name="text">
+              <string>Запись в файл</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QPushButton" name="bt_stop_capture">
+             <property name="text">
+              <string>Завершить захват кадров</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QPushButton" name="bt_start_capture">
+             <property name="text">
+              <string>Начать захват кадров</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="l_list_cameras">
+             <property name="text">
+              <string>Доступные камеры:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="c_list_cameras"/>
+           </item>
+           <item row="3" column="1">
+            <widget class="QPushButton" name="bt_stop_record">
+             <property name="text">
+              <string>Завершить запись</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0" colspan="2">
+            <widget class="QPushButton" name="bt_update_cameras">
+             <property name="text">
+              <string>Обновить список камер</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="group_contrast_enhancement">
+          <property name="title">
+           <string>Настройки улучшения контраста</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="0" column="0">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string> Пока ничего</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="group_ROI">
+          <property name="title">
+           <string>ROI</string>
+          </property>
+          <widget class="QLabel" name="label_2">
+           <property name="geometry">
+            <rect>
+             <x>10</x>
+             <y>20</y>
+             <width>667</width>
+             <height>264</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string> Пока ничего</string>
+           </property>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_file">
+       <attribute name="title">
+        <string>Видеофайл</string>
+       </attribute>
+      </widget>
      </widget>
     </item>
    </layout>
@@ -99,10 +141,16 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>911</width>
+     <width>1013</width>
      <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>Файл</string>
+    </property>
+   </widget>
+   <addaction name="menu"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>

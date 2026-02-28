@@ -2,19 +2,36 @@ from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QImage, QPixmap
 import cv2
 import time
+from PyQt5.QtCore import QThread
 
 class VideoHandler(QObject):
     def __init__(self, camera):
         super().__init__()
         self.camera = camera
+        self.flag_open_file = False
+
 
     paint_frame = pyqtSignal(QPixmap)
+    open_file = pyqtSignal(int, int, int, str)
+    record_frame = pyqtSignal(QImage)
+    close_file = pyqtSignal()
 
     @pyqtSlot()
     def run(self):
+        flag_try_close = True
         try:
             while self.camera.flag_capture:
                 ret, rgb_frame = self.camera.cap.read()
+
+                if self.camera.flag_record and not self.flag_open_file:
+                    self.open_file.emit(self.camera.width, self.camera.height, self.camera.fps, self.camera.name)
+
+                    #FIXME: в будущем класс Recorder должен с помощью сигнала сообщать об успехе открытия файла
+                    self.flag_open_file = True
+
+                if not self.camera.flag_record and self.flag_open_file and flag_try_close:
+                    flag_try_close = False
+                    self.close_file.emit()
 
                 if not ret:
                     time.sleep(0.01)
@@ -31,11 +48,9 @@ class VideoHandler(QObject):
 
                 self.paint_frame.emit(pixmap)
 
-                #TODO: Заменить на сигнал и запись в другом потоке
-                """
-                if self.flag_record:
-                    self.write_video(rgb_frame)
-                """
+                if self.camera.flag_record and self.flag_open_file:
+                    self.record_frame.emit(q_image)
+
         except Exception as e:
             print(e)
         finally:

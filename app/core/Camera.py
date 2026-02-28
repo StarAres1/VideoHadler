@@ -1,8 +1,8 @@
 import cv2
-from datetime import datetime
 from app.core.VideoHandler import VideoHandler
+from app.core.Recorder import Recorder
 from PyQt5.QtCore import QThread
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject
+from PyQt5.QtCore import pyqtSlot, QObject
 from PyQt5.QtGui import QPixmap
 
 class Camera(QObject):
@@ -11,25 +11,23 @@ class Camera(QObject):
         self.cap = None
         self.index = index
         self.name = name
-        self.flag_record = False
-        self.fourcc = None
         self.width = None
         self.height = None
         self.channel = None
-        self.output = None
         self.fps = None
         self.video_frame = video_frame
+
         self.thread_show = QThread()
         self.worker_show = None
-        self.flag_capture = None
 
         self.thread_write = QThread()
+        self.worker_write = None
+
+        self.flag_capture = None
+        self.flag_record = None
 
 
     def disconnect(self):
-        if self.flag_record:
-            self.stop_record()
-
         self.cap.release()
 
 
@@ -65,31 +63,6 @@ class Camera(QObject):
     def display_frame(self, pixmap):
         self.video_frame.setPixmap(pixmap)
 
-
-    def start_record(self):
-        self.flag_record = True
-
-        self.fourcc = cv2.VideoWriter_fourcc(*'XVID') # для формата avi
-        filename = f'video_output/{self.name}_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.avi'
-        self.output = cv2.VideoWriter(
-            filename.replace(" ", "_"),
-            self.fourcc,
-            self.fps,
-            (self.width, self.height))
-
-    def stop_record(self):
-        self.flag_record = False
-        self.fourcc = None
-
-        self.output.release()
-        self.output = None
-
-    def write_video(self, frame):
-        if self.output is None:
-            return
-
-        self.output.write(frame)
-
     def get_property(self):
         if not self.cap.isOpened():
             return False
@@ -103,3 +76,25 @@ class Camera(QObject):
 
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         return True
+
+    def start_record(self):
+        self.flag_record = True
+
+        self.worker_write = Recorder(self.width, self.height, self.fps, self.name)
+        self.worker_write.moveToThread(self.thread_write)
+
+        self.thread_write.started.connect(self.worker_write.open_file)
+        self.worker_show.record_frame.connect(self.worker_write.record)
+        self.worker_show.close_file.connect(self.worker_write.close_file)
+
+        self.thread_write.start()
+
+
+
+    def stop_record(self):
+        self.flag_record = False
+
+        #FIXME: должно вызываться сингалом, задержка - костыль, чтобы слот
+        # close в Recorder успел выполниться
+        self.thread_write.wait(1000)
+        self.thread_write.quit()
