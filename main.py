@@ -4,6 +4,7 @@ import threading
 import sys
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from app.core.Camera import Camera
+from app.core.Enums import ContrastImprovement
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -30,6 +31,10 @@ if __name__ == "__main__":
 
     # завершить запись в файл
     ui.bt_stop_record.clicked.connect(cameraManager.cameras[0].stop_record)
+
+    # выбор метода улучшения контраста
+    ui.r_CLAHE.clicked.connect(lambda: cameraManager.cameras[0].set_method_for_contrast(ContrastImprovement.CLAHE))
+    ui.r_NotImprove.clicked.connect(lambda: cameraManager.cameras[0].set_method_for_contrast(ContrastImprovement.NotImprove))
 
     MainWindow.show()
     sys.exit(app.exec_())

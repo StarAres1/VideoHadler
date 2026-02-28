@@ -4,6 +4,7 @@ from app.core.Recorder import Recorder
 from PyQt5.QtCore import QThread
 from PyQt5.QtCore import pyqtSlot, QObject
 from PyQt5.QtGui import QPixmap
+from app.core.Enums import ContrastImprovement
 
 class Camera(QObject):
     def __init__(self, index, name, video_frame):
@@ -26,10 +27,13 @@ class Camera(QObject):
         self.flag_capture = None
         self.flag_record = None
 
+        self.method_for_contrast = ContrastImprovement.NotImprove
+
+    def set_method_for_contrast(self, method):
+        self.method_for_contrast = method
 
     def disconnect(self):
         self.cap.release()
-
 
     def start_capture(self):
 

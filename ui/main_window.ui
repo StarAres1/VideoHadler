@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1013</width>
-    <height>784</height>
+    <width>1035</width>
+    <height>858</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -94,11 +94,98 @@
           <property name="title">
            <string>Настройки улучшения контраста</string>
           </property>
-          <layout class="QGridLayout" name="gridLayout_3">
-           <item row="0" column="0">
-            <widget class="QLabel" name="label">
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="4" column="0">
+            <widget class="QRadioButton" name="radioButton_3">
              <property name="text">
-              <string> Пока ничего</string>
+              <string>Метод 3</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QToolButton" name="toolButton_4">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0">
+            <widget class="QRadioButton" name="radioButton_5">
+             <property name="text">
+              <string>Метод 5</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="1">
+            <widget class="QToolButton" name="toolButton_5">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QToolButton" name="bt_CLAHE">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QRadioButton" name="radioButton_2">
+             <property name="text">
+              <string>Метод 2</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QToolButton" name="toolButton_3">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="r_CLAHE">
+             <property name="text">
+              <string>CLAHE</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QToolButton" name="toolButton_2">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="1">
+            <widget class="QToolButton" name="toolButton_6">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="QRadioButton" name="radioButton_6">
+             <property name="text">
+              <string>Метод 6</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QRadioButton" name="radioButton_4">
+             <property name="text">
+              <string>Метод 4</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QRadioButton" name="r_NotImprove">
+             <property name="text">
+              <string>Нет</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -106,23 +193,24 @@
          </widget>
         </item>
         <item>
+         <widget class="QGroupBox" name="group_enhancement">
+          <property name="title">
+           <string>Настройки улучшения качества</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QGroupBox" name="group_ROI">
           <property name="title">
-           <string>ROI</string>
+           <string>ROI и масштабирование</string>
           </property>
-          <widget class="QLabel" name="label_2">
-           <property name="geometry">
-            <rect>
-             <x>10</x>
-             <y>20</y>
-             <width>667</width>
-             <height>264</height>
-            </rect>
-           </property>
-           <property name="text">
-            <string> Пока ничего</string>
-           </property>
-          </widget>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="group_other">
+          <property name="title">
+           <string>Другое</string>
+          </property>
          </widget>
         </item>
        </layout>
@@ -141,7 +229,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1013</width>
+     <width>1035</width>
      <height>22</height>
     </rect>
    </property>

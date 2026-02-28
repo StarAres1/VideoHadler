@@ -3,6 +3,8 @@ from PyQt5.QtGui import QImage, QPixmap
 import cv2
 import time
 from PyQt5.QtCore import QThread
+from app.core.Enums import ContrastImprovement
+from app.core.ContrastImprover import ContrastImprover
 
 class VideoHandler(QObject):
     def __init__(self, camera):
@@ -39,7 +41,14 @@ class VideoHandler(QObject):
 
                 rgb_frame = cv2.flip(rgb_frame, 1)
 
-                frame = cv2.cvtColor(rgb_frame, cv2.COLOR_BGR2RGB)
+                match self.camera.method_for_contrast:
+                    case ContrastImprovement.NotImprove:
+                        frame = cv2.cvtColor(rgb_frame, cv2.COLOR_BGR2RGB)
+                    case ContrastImprovement.CLAHE:
+                        frame = ContrastImprover.CLAHE(rgb_frame)
+                    case _:
+                        frame = cv2.cvtColor(rgb_frame, cv2.COLOR_BGR2RGB)
+
                 bytes_per_line = self.camera.channel * self.camera.width
 
                 q_image = QImage(frame.data, self.camera.width, self.camera.height, bytes_per_line, QImage.Format_RGB888)
