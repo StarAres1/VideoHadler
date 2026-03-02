@@ -7,7 +7,7 @@ from PyQt5.QtGui import QPixmap
 from app.core.Enums import ContrastImprovement
 
 class Camera(QObject):
-    def __init__(self, index, name, video_frame):
+    def __init__(self, index, name, video_frame, ui):
         super().__init__()
         self.cap = None
         self.index = index
@@ -17,6 +17,7 @@ class Camera(QObject):
         self.channel = None
         self.fps = None
         self.video_frame = video_frame
+        self.ui = ui
 
         self.thread_show = QThread()
         self.worker_show = None
@@ -54,6 +55,7 @@ class Camera(QObject):
 
         self.worker_show.paint_frame.connect(self.display_frame)
         self.thread_show.started.connect(self.worker_show.run)
+        self.worker_show.show_fps.connect(self.show_fps)
 
         self.thread_show.start()
 
@@ -66,6 +68,10 @@ class Camera(QObject):
     @pyqtSlot(QPixmap)
     def display_frame(self, pixmap):
         self.video_frame.setPixmap(pixmap)
+
+    @pyqtSlot(float)
+    def show_fps(self, fps):
+        self.ui.statusbar.showMessage(f"FPS: {fps:.2f}")
 
     def get_property(self):
         if not self.cap.isOpened():

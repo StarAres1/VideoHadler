@@ -14,7 +14,7 @@ if __name__ == "__main__":
     ui.setupUi(MainWindow)
 
     # поиск доступных камер сразу после включения приложения
-    cameraManager = CameraManager(ui.videoFrame)
+    cameraManager = CameraManager(ui.videoFrame, ui)
     cameraManager.find_cameras(ui.c_list_cameras)
 
     # обновление списка доступных камер
@@ -35,6 +35,8 @@ if __name__ == "__main__":
     # выбор метода улучшения контраста
     ui.r_CLAHE.clicked.connect(lambda: cameraManager.cameras[0].set_method_for_contrast(ContrastImprovement.CLAHE))
     ui.r_NotImprove.clicked.connect(lambda: cameraManager.cameras[0].set_method_for_contrast(ContrastImprovement.NotImprove))
+    ui.r_Retinex.clicked.connect(lambda: cameraManager.cameras[0].set_method_for_contrast(ContrastImprovement.Retinex))
+    ui.r_HE.clicked.connect(lambda: cameraManager.cameras[0].set_method_for_contrast(ContrastImprovement.HE))
 
     MainWindow.show()
     sys.exit(app.exec_())
