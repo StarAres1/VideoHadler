@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1009</width>
-    <height>650</height>
+    <height>704</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -95,6 +95,16 @@
            <string>Настройки улучшения контраста</string>
           </property>
           <layout class="QGridLayout" name="gridLayout">
+           <item row="0" column="0">
+            <widget class="QRadioButton" name="r_NotImprove">
+             <property name="text">
+              <string>Нет</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
            <item row="4" column="0">
             <widget class="QRadioButton" name="r_HE">
              <property name="text">
@@ -102,10 +112,17 @@
              </property>
             </widget>
            </item>
-           <item row="5" column="1">
-            <widget class="QToolButton" name="toolButton_4">
+           <item row="6" column="1">
+            <widget class="QToolButton" name="toolButton_5">
              <property name="text">
               <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="QRadioButton" name="radioButton_6">
+             <property name="text">
+              <string>Метод 6</string>
              </property>
             </widget>
            </item>
@@ -116,8 +133,15 @@
              </property>
             </widget>
            </item>
-           <item row="6" column="1">
-            <widget class="QToolButton" name="toolButton_5">
+           <item row="4" column="1">
+            <widget class="QToolButton" name="bt_HE">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="1">
+            <widget class="QToolButton" name="toolButton_6">
              <property name="text">
               <string>...</string>
              </property>
@@ -133,14 +157,21 @@
            <item row="3" column="0">
             <widget class="QRadioButton" name="r_Retinex">
              <property name="text">
-              <string>Retinex</string>
+              <string>Retinex !!!</string>
              </property>
             </widget>
            </item>
-           <item row="4" column="1">
-            <widget class="QToolButton" name="bt_HE">
+           <item row="5" column="1">
+            <widget class="QToolButton" name="toolButton_4">
              <property name="text">
               <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QRadioButton" name="radioButton_4">
+             <property name="text">
+              <string>Метод 4</string>
              </property>
             </widget>
            </item>
@@ -158,34 +189,17 @@
              </property>
             </widget>
            </item>
-           <item row="7" column="1">
-            <widget class="QToolButton" name="toolButton_6">
+           <item row="8" column="0">
+            <widget class="QRadioButton" name="radioButton">
+             <property name="text">
+              <string>RadioButton</string>
+             </property>
+            </widget>
+           </item>
+           <item row="8" column="1">
+            <widget class="QToolButton" name="toolButton_9">
              <property name="text">
               <string>...</string>
-             </property>
-            </widget>
-           </item>
-           <item row="7" column="0">
-            <widget class="QRadioButton" name="radioButton_6">
-             <property name="text">
-              <string>Метод 6</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0">
-            <widget class="QRadioButton" name="radioButton_4">
-             <property name="text">
-              <string>Метод 4</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QRadioButton" name="r_NotImprove">
-             <property name="text">
-              <string>Нет</string>
-             </property>
-             <property name="checked">
-              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -195,8 +209,90 @@
         <item>
          <widget class="QGroupBox" name="group_enhancement">
           <property name="title">
-           <string>Настройки улучшения качества</string>
+           <string>Настройки подавления шума</string>
           </property>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="5" column="0">
+            <widget class="QRadioButton" name="r_FastNlMeansDenoising">
+             <property name="text">
+              <string>FastNlMeansDenoising</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QToolButton" name="toolButton_2">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="r_Blur">
+             <property name="text">
+              <string>Blur</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QRadioButton" name="r_MedianBlur">
+             <property name="text">
+              <string>MedianBlur</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QToolButton" name="toolButton_3">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QToolButton" name="toolButton_7">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QToolButton" name="toolButton">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QRadioButton" name="r_NotReductionNoise">
+             <property name="text">
+              <string>Нет</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QRadioButton" name="r_BilateralFilter">
+             <property name="text">
+              <string>BilateralFilter</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QRadioButton" name="r_GaussianBlur">
+             <property name="text">
+              <string>GaussianBlur</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QToolButton" name="toolButton_8">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
         <item>

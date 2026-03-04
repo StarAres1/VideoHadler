@@ -2,8 +2,9 @@ from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QImage, QPixmap
 import cv2
 import time
-from app.core.Enums import ContrastImprovement
+from app.core.Enums import ContrastImprovement, NoiseReduction
 from app.core.ContrastImprover import ContrastImprover
+from app.core.QualityImprover import QualityImprover
 
 class VideoHandler(QObject):
     def __init__(self, camera):
@@ -46,7 +47,23 @@ class VideoHandler(QObject):
                     continue
 
                 frame = cv2.flip(frame, 1)
-                # секция методов улучшения качества изображения
+
+                # секция методов подавления шума
+                match self.camera.method_for_noise:
+                    case NoiseReduction.NotReduction:
+                        pass
+                    case NoiseReduction.Blur:
+                        frame = QualityImprover.blur(frame)
+                    case NoiseReduction.GaussianBlur:
+                        frame = QualityImprover.gaussianBlur(frame)
+                    case NoiseReduction.MedianBlur:
+                        frame = QualityImprover.medianBlur(frame)
+                    case NoiseReduction.BilateralFilter:
+                        frame = QualityImprover.bilateralFilter(frame)
+                    case NoiseReduction.BilateralFilter:
+                        frame = QualityImprover.fastNl(frame)
+                    case _:
+                        pass
 
                 # секция методов улучшения контраста
                 match self.camera.method_for_contrast:
@@ -58,6 +75,14 @@ class VideoHandler(QObject):
                         frame = ContrastImprover.Retinex(frame)
                     case ContrastImprovement.HE:
                         frame = ContrastImprover.HE(frame)
+                    case ContrastImprovement.gamma:
+                        frame = ContrastImprover.gamma_correction(frame)
+                    case ContrastImprovement.autoGamma:
+                        frame = ContrastImprover.auto_gamma(frame)
+                    case ContrastImprovement.sigmoid:
+                        frame = ContrastImprover.sigmoid_correction(frame)
+                    case ContrastImprovement.combined:
+                        frame = ContrastImprover.combined_enhancement(frame)
                     case _:
                         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
