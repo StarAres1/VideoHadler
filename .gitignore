@@ -188,3 +188,4 @@ dataset/photo
 dataset/test
 dataset/train
 other
+!other/scripts
