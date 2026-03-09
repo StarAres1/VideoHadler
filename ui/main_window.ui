@@ -6,12 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1009</width>
-    <height>704</height>
+    <width>1003</width>
+    <height>1040</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true"/>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
@@ -27,6 +30,12 @@
     </item>
     <item>
      <widget class="QTabWidget" name="tabWidget">
+      <property name="maximumSize">
+       <size>
+        <width>500</width>
+        <height>16777215</height>
+       </size>
+      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
@@ -37,45 +46,22 @@
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QGroupBox" name="group_grabling_video">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Настройки захвата кадров с камеры</string>
           </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
           <layout class="QGridLayout" name="gridLayout_2">
-           <item row="3" column="0">
-            <widget class="QPushButton" name="bt_start_record">
-             <property name="text">
-              <string>Запись в файл</string>
-             </property>
-            </widget>
-           </item>
            <item row="2" column="1">
             <widget class="QPushButton" name="bt_stop_capture">
              <property name="text">
-              <string>Завершить захват кадров</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QPushButton" name="bt_start_capture">
-             <property name="text">
-              <string>Начать захват кадров</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="l_list_cameras">
-             <property name="text">
-              <string>Доступные камеры:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QComboBox" name="c_list_cameras"/>
-           </item>
-           <item row="3" column="1">
-            <widget class="QPushButton" name="bt_stop_record">
-             <property name="text">
-              <string>Завершить запись</string>
+              <string>Стоп</string>
              </property>
             </widget>
            </item>
@@ -86,13 +72,52 @@
              </property>
             </widget>
            </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="c_list_cameras"/>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="l_list_cameras">
+             <property name="text">
+              <string>Доступные камеры:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QPushButton" name="bt_start_capture">
+             <property name="text">
+              <string>Старт</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QPushButton" name="bt_stop_record">
+             <property name="text">
+              <string>Завершить запись</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QPushButton" name="bt_start_record">
+             <property name="text">
+              <string>Запись в файл</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
         <item>
          <widget class="QGroupBox" name="group_contrast_enhancement">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Настройки улучшения контраста</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
           </property>
           <layout class="QGridLayout" name="gridLayout">
            <item row="0" column="0">
@@ -105,45 +130,10 @@
              </property>
             </widget>
            </item>
-           <item row="4" column="0">
-            <widget class="QRadioButton" name="r_HE">
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="r_CLAHE">
              <property name="text">
-              <string>HE</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="1">
-            <widget class="QToolButton" name="toolButton_5">
-             <property name="text">
-              <string>...</string>
-             </property>
-            </widget>
-           </item>
-           <item row="7" column="0">
-            <widget class="QRadioButton" name="radioButton_6">
-             <property name="text">
-              <string>Метод 6</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="0">
-            <widget class="QRadioButton" name="radioButton_5">
-             <property name="text">
-              <string>Метод 5</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="1">
-            <widget class="QToolButton" name="bt_HE">
-             <property name="text">
-              <string>...</string>
-             </property>
-            </widget>
-           </item>
-           <item row="7" column="1">
-            <widget class="QToolButton" name="toolButton_6">
-             <property name="text">
-              <string>...</string>
+              <string>CLAHE</string>
              </property>
             </widget>
            </item>
@@ -154,14 +144,42 @@
              </property>
             </widget>
            </item>
-           <item row="3" column="0">
+           <item row="2" column="0">
             <widget class="QRadioButton" name="r_Retinex">
              <property name="text">
-              <string>Retinex !!!</string>
+              <string>Линейное преобразование</string>
              </property>
             </widget>
            </item>
-           <item row="5" column="1">
+           <item row="2" column="1">
+            <widget class="QToolButton" name="bt_Retinex">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QRadioButton" name="r_HE">
+             <property name="text">
+              <string>Эквализация гистограммы</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QToolButton" name="bt_HE">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QRadioButton" name="radioButton_4">
+             <property name="text">
+              <string>Гамма-коррекция</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
             <widget class="QToolButton" name="toolButton_4">
              <property name="text">
               <string>...</string>
@@ -169,34 +187,41 @@
             </widget>
            </item>
            <item row="5" column="0">
-            <widget class="QRadioButton" name="radioButton_4">
+            <widget class="QRadioButton" name="radioButton_5">
              <property name="text">
-              <string>Метод 4</string>
+              <string>Авто гамма-коррекция</string>
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
-            <widget class="QRadioButton" name="r_CLAHE">
-             <property name="text">
-              <string>CLAHE</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QToolButton" name="bt_Retinex">
+           <item row="5" column="1">
+            <widget class="QToolButton" name="toolButton_5">
              <property name="text">
               <string>...</string>
              </property>
             </widget>
            </item>
-           <item row="8" column="0">
-            <widget class="QRadioButton" name="radioButton">
+           <item row="6" column="0">
+            <widget class="QRadioButton" name="radioButton_6">
              <property name="text">
-              <string>RadioButton</string>
+              <string>Сигмоидная коррекция</string>
              </property>
             </widget>
            </item>
-           <item row="8" column="1">
+           <item row="6" column="1">
+            <widget class="QToolButton" name="toolButton_6">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="0">
+            <widget class="QRadioButton" name="radioButton">
+             <property name="text">
+              <string>Комбинированная коррекция</string>
+             </property>
+            </widget>
+           </item>
+           <item row="7" column="1">
             <widget class="QToolButton" name="toolButton_9">
              <property name="text">
               <string>...</string>
@@ -208,35 +233,22 @@
         </item>
         <item>
          <widget class="QGroupBox" name="group_enhancement">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Настройки подавления шума</string>
           </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
           <layout class="QGridLayout" name="gridLayout_3">
-           <item row="5" column="0">
-            <widget class="QRadioButton" name="r_FastNlMeansDenoising">
+           <item row="4" column="0">
+            <widget class="QRadioButton" name="r_BilateralFilter">
              <property name="text">
-              <string>FastNlMeansDenoising</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="1">
-            <widget class="QToolButton" name="toolButton_2">
-             <property name="text">
-              <string>...</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <widget class="QRadioButton" name="r_Blur">
-             <property name="text">
-              <string>Blur</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0">
-            <widget class="QRadioButton" name="r_MedianBlur">
-             <property name="text">
-              <string>MedianBlur</string>
+              <string>BilateralFilter</string>
              </property>
             </widget>
            </item>
@@ -247,6 +259,13 @@
              </property>
             </widget>
            </item>
+           <item row="3" column="0">
+            <widget class="QRadioButton" name="r_MedianBlur">
+             <property name="text">
+              <string>MedianBlur</string>
+             </property>
+            </widget>
+           </item>
            <item row="4" column="1">
             <widget class="QToolButton" name="toolButton_7">
              <property name="text">
@@ -254,8 +273,36 @@
              </property>
             </widget>
            </item>
-           <item row="1" column="1">
-            <widget class="QToolButton" name="toolButton">
+           <item row="5" column="0">
+            <widget class="QRadioButton" name="r_FastNlMeansDenoising">
+             <property name="text">
+              <string>FastNlMeansDenoising</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QRadioButton" name="r_GaussianBlur">
+             <property name="text">
+              <string>GaussianBlur</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="r_Blur">
+             <property name="text">
+              <string>Blur</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QToolButton" name="toolButton_8">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QToolButton" name="toolButton_2">
              <property name="text">
               <string>...</string>
              </property>
@@ -271,22 +318,8 @@
              </property>
             </widget>
            </item>
-           <item row="4" column="0">
-            <widget class="QRadioButton" name="r_BilateralFilter">
-             <property name="text">
-              <string>BilateralFilter</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QRadioButton" name="r_GaussianBlur">
-             <property name="text">
-              <string>GaussianBlur</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="1">
-            <widget class="QToolButton" name="toolButton_8">
+           <item row="1" column="1">
+            <widget class="QToolButton" name="toolButton">
              <property name="text">
               <string>...</string>
              </property>
@@ -297,15 +330,31 @@
         </item>
         <item>
          <widget class="QGroupBox" name="group_ROI">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>ROI и масштабирование</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QGroupBox" name="group_other">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="title">
            <string>Другое</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
           </property>
          </widget>
         </item>
@@ -325,7 +374,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1009</width>
+     <width>1003</width>
      <height>22</height>
     </rect>
    </property>

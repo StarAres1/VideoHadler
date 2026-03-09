@@ -22,8 +22,7 @@ class QualityImprover:
 
     @staticmethod
     def fastNl(frame):
-        result = None
-        cv2.fastNlMeansDenoisingColored(
+        result = cv2.fastNlMeansDenoisingColored(
             frame,
             h=30,
             hColor=10,

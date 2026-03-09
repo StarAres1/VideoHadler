@@ -5,9 +5,20 @@ import sys
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from app.core.Camera import Camera
 from app.core.Enums import ContrastImprovement, NoiseReduction
+from PyQt5.QtCore import QFile, QTextStream
+
+
+def load_stylesheet(filename):
+    file = QFile(filename)
+    if not file.open(QFile.ReadOnly | QFile.Text):
+        return ""
+    stream = QTextStream(file)
+    return stream.readAll()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyleSheet(load_stylesheet("styles/style.qss"))
 
     MainWindow = QMainWindow()
     ui = Ui_MainWindow()

@@ -32,7 +32,7 @@ class ContrastImprover:
 
             return res
 
-
+    @staticmethod
     def Retinex(img_bgr, alpha=2, beta=10):
         enhanced_bgr = cv2.convertScaleAbs(img_bgr, alpha=alpha, beta=beta)
 
