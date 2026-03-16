@@ -1,6 +1,5 @@
 import json
 import cv2
-import torch
 import numpy as np
 from app.core.ContrastImprover import ContrastImprover
 import piq
@@ -10,13 +9,21 @@ import os
 import re
 import time
 
-# ---------------------- Вспомогательные функции ----------------------
+import torch
+import torch_directml
+
+# Определяем устройство DirectML (автоматически выберет лучший GPU)
+device = torch_directml.device()
+print(f"Используется устройство: {device}")
+
+# В функции img_to_tensor оставляем тензор на CPU, затем перемещаем
 def img_to_tensor(img):
-    """Конвертирует изображение OpenCV (BGR) в тензор Torch (NCHW, значения [0,1])"""
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     tensor = torch.from_numpy(img_rgb).permute(2, 0, 1).float()
     tensor = tensor.unsqueeze(0) / 255.0
-    return tensor
+    return tensor.to(device)   # перемещаем на GPU через DirectML
+
+# ---------------------- Вспомогательные функции ----------------------
 
 def compute_rms_contrast(img):
     """Среднеквадратичный контраст (стандартное отклонение яркости)"""
@@ -262,6 +269,7 @@ def main():
     parser.add_argument("--output", type=str, default="best_methods.jsonl", help="Выходной файл в формате JSON Lines (по умолчанию best_methods.jsonl)")
     parser.add_argument("--ext", type=str, default=".png", help="Расширение файлов (по умолчанию .png)")
     parser.add_argument("--start_num", type=int, default=1, help="Начинать обработку с изображений, чей номер референса не меньше указанного (по умолчанию 1)")
+    parser.add_argument("--end_num", type=int, default=700, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
     args = parser.parse_args()
 
     # Получаем список искажённых файлов
@@ -270,7 +278,7 @@ def main():
         print(f"Файлы с расширением {args.ext} не найдены в {args.low_dir}")
         return
 
-    # Извлекаем номер референса из каждого имени и фильтруем те, что не подходят под шаблон
+    # Извлекаем номер референса из каждого имени
     file_data = []  # (числовой_номер, имя_файла)
     pattern = re.compile(r"^(\d+)_.*")
     for f in all_files:
@@ -288,17 +296,25 @@ def main():
     # Сортируем по числовому номеру
     file_data.sort(key=lambda x: x[0])
 
-    # Фильтруем по start_num
-    file_data = [(num, f) for num, f in file_data if num >= args.start_num]
+    # Фильтруем по диапазону номеров
+    filtered_data = []
+    for num, f in file_data:
+        if num >= args.start_num:
+            if args.end_num is not None and num > args.end_num:
+                continue
+            filtered_data.append((num, f))
 
-    # Загружаем уже обработанные ключи из выходного файла (если он есть)
+    if not filtered_data:
+        print(f"Нет изображений с номерами от {args.start_num} до {args.end_num if args.end_num else '∞'}.")
+        return
+
+    # Загружаем уже обработанные ключи из выходного файла
     processed_keys = load_processed_keys(args.output)
 
     # Открываем выходной файл в режиме добавления
     with open(args.output, 'a', encoding='utf-8') as f_out:
-        for num, low_file in tqdm(file_data, desc="Обработка изображений"):
+        for num, low_file in tqdm(filtered_data, desc="Обработка изображений"):
             key = os.path.splitext(low_file)[0]
-            # Пропускаем, если уже обработано
             if key in processed_keys:
                 continue
 
@@ -306,7 +322,6 @@ def main():
             low_path = os.path.join(args.low_dir, low_file)
             ref_path = os.path.join(args.ref_dir, ref_file)
 
-            # Проверяем существование эталона
             if not os.path.isfile(ref_path):
                 print(f"Предупреждение: эталон {ref_path} не найден, пропускаем {low_file}")
                 continue
@@ -320,7 +335,6 @@ def main():
                 }
                 f_out.write(json.dumps(output_record, ensure_ascii=False) + '\n')
                 f_out.flush()
-                # Добавляем ключ в множество, чтобы не обработать повторно в этом же запуске (хотя это не обязательно)
                 processed_keys.add(key)
 
     print(f"\nРезультаты сохранены/добавлены в {args.output} (формат JSON Lines)")
