@@ -15,6 +15,9 @@ class VideoHandler(QObject):
         self.current_frame = 0.0
         self.current_time = 0.0
 
+        self.clipLimit = 2
+        self.titleGridSize = 4
+
 
     paint_frame = pyqtSignal(QPixmap)
     open_file = pyqtSignal(int, int, int, str)
@@ -47,6 +50,7 @@ class VideoHandler(QObject):
                     continue
 
                 frame = cv2.flip(frame, 1)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                 # секция методов подавления шума
                 match self.camera.method_for_noise:
@@ -68,9 +72,10 @@ class VideoHandler(QObject):
                 # секция методов улучшения контраста
                 match self.camera.method_for_contrast:
                     case ContrastImprovement.NotImprove:
-                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        pass
                     case ContrastImprovement.CLAHE:
-                        frame = ContrastImprover.CLAHE(frame)
+                        frame = ContrastImprover.CLAHE(frame, clipLimit=self.clipLimit, titleGridSizeX=self.titleGridSize,
+                                                       titleGridSizeY=self.titleGridSize)
                     case ContrastImprovement.Retinex:
                         frame = ContrastImprover.Retinex(frame)
                     case ContrastImprovement.HE:
@@ -84,7 +89,7 @@ class VideoHandler(QObject):
                     case ContrastImprovement.combined:
                         frame = ContrastImprover.combined_enhancement(frame)
                     case _:
-                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        pass
 
                 bytes_per_line = self.camera.channel * self.camera.width
 

@@ -104,7 +104,6 @@ class Camera(QObject):
         self.thread_write.start()
 
 
-
     def stop_record(self):
         self.flag_record = False
 
@@ -112,3 +111,11 @@ class Camera(QObject):
         # close в Recorder успел выполниться
         self.thread_write.wait(1000)
         self.thread_write.quit()
+
+    @pyqtSlot(float)
+    def set_clipLimit_CLAHE(self, clipLimit):
+        self.worker_show.clipLimit = clipLimit
+
+    @pyqtSlot(int)
+    def set_titleGridSize_CLAHE(self, titleGridSize):
+        self.worker_show.titleGridSize = titleGridSize

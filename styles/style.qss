@@ -132,6 +132,81 @@ QSpinBox:disabled {
     border-color: #bdc3c7;
 }
 
+/* ========== DOUBLE SPINBOX ========== */
+QDoubleSpinBox {
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    padding: 4px 6px;
+    background-color: white;
+    min-height: 20px;
+    font-size: 12pt;
+    color: #2c3e50;
+}
+
+QDoubleSpinBox:hover {
+    border-color: #3498db;
+}
+
+QDoubleSpinBox:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+QDoubleSpinBox::up-button, QSpinBox::down-button {
+    width: 20px;
+    border-left: 1px solid #bdc3c7;
+    background-color: #f8f9f9;
+}
+
+QDoubleSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    border-top-right-radius: 4px;
+}
+
+QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    border-bottom-right-radius: 4px;
+}
+
+QDoubleSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #e8f0fe;
+}
+
+QDoubleSpinBox::up-button:pressed, QSpinBox::down-button:pressed {
+    background-color: #d4e6f1;
+}
+
+/* Кастомные стрелки (без url) */
+QDoubleSpinBox::up-arrow {
+    width: 8px;
+    height: 8px;
+    border-left: 2px solid #2c3e50;
+    border-top: 2px solid #2c3e50;
+    transform: rotate(45deg);
+    margin-bottom: 2px;
+}
+
+QDoubleSpinBox::down-arrow {
+    width: 8px;
+    height: 8px;
+    border-left: 2px solid #2c3e50;
+    border-bottom: 2px solid #2c3e50;
+    transform: rotate(-45deg);
+    margin-top: 2px;
+}
+
+QDoubleSpinBox::up-arrow:disabled, QSpinBox::down-arrow:disabled {
+    border-color: #bdc3c7;
+}
+
+QDoubleSpinBox:disabled {
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+    border-color: #bdc3c7;
+}
+
 /* ========== PUSH BUTTON ========== */
 QPushButton {
     background-color: #3498db;

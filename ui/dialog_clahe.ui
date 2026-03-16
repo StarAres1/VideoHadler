@@ -20,41 +20,43 @@
    <string notr="true"/>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="1" column="2">
-    <widget class="QSlider" name="horizontalSlider">
-     <property name="maximum">
-      <number>100</number>
-     </property>
+   <item row="1" column="1" rowspan="2">
+    <spacer name="verticalSpacer">
      <property name="orientation">
-      <enum>Qt::Orientation::Horizontal</enum>
+      <enum>Qt::Orientation::Vertical</enum>
      </property>
-    </widget>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
    </item>
    <item row="2" column="2">
-    <widget class="QSlider" name="horizontalSlider_2">
+    <widget class="QSlider" name="slider_titlleGrid">
      <property name="styleSheet">
       <string notr="true"/>
      </property>
      <property name="minimum">
-      <number>3</number>
+      <number>2</number>
      </property>
      <property name="maximum">
-      <number>50</number>
+      <number>64</number>
+     </property>
+     <property name="singleStep">
+      <number>2</number>
+     </property>
+     <property name="pageStep">
+      <number>2</number>
      </property>
      <property name="orientation">
       <enum>Qt::Orientation::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="label">
-     <property name="text">
-      <string>Порог ограничения контраста</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1" rowspan="2">
-    <spacer name="verticalSpacer">
+   <item row="1" column="3" rowspan="2">
+    <spacer name="verticalSpacer_2">
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
      </property>
@@ -73,33 +75,10 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="4">
-    <widget class="QSpinBox" name="spinBox">
-     <property name="maximum">
-      <number>100</number>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="3" rowspan="2">
-    <spacer name="verticalSpacer_2">
-     <property name="orientation">
-      <enum>Qt::Orientation::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item row="2" column="4">
-    <widget class="QSpinBox" name="spinBox_2">
-     <property name="minimum">
-      <number>3</number>
-     </property>
-     <property name="maximum">
-      <number>50</number>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Порог ограничения контраста</string>
      </property>
     </widget>
    </item>
@@ -115,6 +94,48 @@
       </size>
      </property>
     </spacer>
+   </item>
+   <item row="1" column="2">
+    <widget class="QSlider" name="slider_clipLimit">
+     <property name="maximum">
+      <number>80</number>
+     </property>
+     <property name="singleStep">
+      <number>1</number>
+     </property>
+     <property name="pageStep">
+      <number>1</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="4">
+    <widget class="QSpinBox" name="spB_titleGrid">
+     <property name="minimum">
+      <number>2</number>
+     </property>
+     <property name="maximum">
+      <number>64</number>
+     </property>
+     <property name="singleStep">
+      <number>2</number>
+     </property>
+     <property name="value">
+      <number>2</number>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="4">
+    <widget class="QDoubleSpinBox" name="spB_clipLimit">
+     <property name="maximum">
+      <double>40.000000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.500000000000000</double>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
