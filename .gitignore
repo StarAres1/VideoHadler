@@ -189,3 +189,4 @@ dataset/test
 dataset/train
 other
 !other/scripts
+dataset/half
