@@ -257,7 +257,6 @@ def load_processed_keys(output_file):
                 if "image" in data:
                     processed.add(data["image"])
             except json.JSONDecodeError:
-                # Игнорируем повреждённые строки (можно логировать)
                 continue
     return processed
 
@@ -269,7 +268,7 @@ def main():
     parser.add_argument("--output", type=str, default="best_methods.jsonl", help="Выходной файл в формате JSON Lines (по умолчанию best_methods.jsonl)")
     parser.add_argument("--ext", type=str, default=".png", help="Расширение файлов (по умолчанию .png)")
     parser.add_argument("--start_num", type=int, default=1, help="Начинать обработку с изображений, чей номер референса не меньше указанного (по умолчанию 1)")
-    parser.add_argument("--end_num", type=int, default=700, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
+    parser.add_argument("--end_num", type=int, default=500, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
     args = parser.parse_args()
 
     # Получаем список искажённых файлов

@@ -2,6 +2,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMainWindow
 from forms.main_window_ui import Ui_MainWindow
+from app.core.SpinBox_Slider import SpinBox_Slider
 
 from forms.dialog_clahe_ui import Ui_Dialog as ClaheWindow
 
@@ -20,5 +21,8 @@ class MainWindow(QMainWindow):
         ui.setupUi(self.dialog_clahe)
         self.dialog_clahe.show()
 
-        ui.spB_clipLimit.valueChanged.connect(self.camera.set_clipLimit_CLAHE)
-        ui.spB_titleGrid.valueChanged.connect(self.camera.set_titleGridSize_CLAHE)
+        self.sl_sp_titleGrid = SpinBox_Slider(ui.slider_titlleGrid, ui.spB_titleGrid, self.camera.set_titleGridSize_CLAHE,
+                                         4, 4, None, None)
+
+        self.sl_sp_clipLimit = SpinBox_Slider(ui.slider_clipLimit, ui.spB_clipLimit, self.camera.set_clipLimit_CLAHE,
+                                         4, 2.0, SpinBox_Slider.pow2_int, SpinBox_Slider.dec2_float)
