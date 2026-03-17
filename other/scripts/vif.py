@@ -78,8 +78,8 @@ def generate_enhanced_images(low_img):
         img = ContrastImprover.CLAHE(low_img, clipLimit=clip, titleGridSizeX=gx, titleGridSizeY=gy)
         specs.append((img, "CLAHE", {"clipLimit": clip, "gridX": gx, "gridY": gy}))
 
-    # Retinex (оставлено 8 вариаций)
-    retinex_params = [
+    # adjust_contrast (оставлено 8 вариаций)
+    adjust_contrast_params = [
         (2.0, 8),
         (2.0, 12),
         (1.8, 9),
@@ -89,9 +89,9 @@ def generate_enhanced_images(low_img):
         (2.5, 10),
         (2.0, 6),
     ]
-    for alpha, beta in retinex_params:
-        img = ContrastImprover.Retinex(low_img, alpha=alpha, beta=beta)
-        specs.append((img, "Retinex", {"alpha": alpha, "beta": beta}))
+    for alpha, beta in adjust_contrast_params:
+        img = ContrastImprover.adjust_contrast(low_img, alpha=alpha, beta=beta)
+        specs.append((img, "adjust_contrast", {"alpha": alpha, "beta": beta}))
 
     # Гамма-коррекция (7 уровней)
     gamma_values = np.linspace(0.4, 2.1, 7)
@@ -263,12 +263,12 @@ def load_processed_keys(output_file):
 # ---------------------- Основной скрипт ----------------------
 def main():
     parser = argparse.ArgumentParser(description="Выбор наилучшего метода улучшения контраста для каждого искажённого изображения (с дозаписью и сортировкой).")
-    parser.add_argument("--low_dir", type=str, default="../../dataset/photo", help="Папка с искажёнными изображениями")
-    parser.add_argument("--ref_dir", type=str, default="../dataset", help="Папка с эталонными (оригинальными) изображениями")
-    parser.add_argument("--output", type=str, default="best_methods.jsonl", help="Выходной файл в формате JSON Lines (по умолчанию best_methods.jsonl)")
+    parser.add_argument("--low_dir", type=str, default="../../dataset/half", help="Папка с искажёнными изображениями")
+    parser.add_argument("--ref_dir", type=str, default="../half_ref", help="Папка с эталонными (оригинальными) изображениями")
+    parser.add_argument("--output", type=str, default="format_ssim_contrasts.jsonl", help="Выходной файл в формате JSON Lines (по умолчанию best_methods.jsonl)")
     parser.add_argument("--ext", type=str, default=".png", help="Расширение файлов (по умолчанию .png)")
     parser.add_argument("--start_num", type=int, default=1, help="Начинать обработку с изображений, чей номер референса не меньше указанного (по умолчанию 1)")
-    parser.add_argument("--end_num", type=int, default=500, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
+    parser.add_argument("--end_num", type=int, default=None, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
     args = parser.parse_args()
 
     # Получаем список искажённых файлов

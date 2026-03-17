@@ -1,9 +1,9 @@
 import cv2
 from app.core.VideoHandler import VideoHandler
 from app.core.Recorder import Recorder
-from PyQt5.QtCore import QThread
-from PyQt5.QtCore import pyqtSlot, QObject
-from PyQt5.QtGui import QPixmap
+from PyQt6.QtCore import QThread
+from PyQt6.QtCore import pyqtSlot, QObject
+from PyQt6.QtGui import QPixmap
 from app.core.Enums import ContrastImprovement, NoiseReduction
 
 class Camera(QObject):
@@ -20,7 +20,7 @@ class Camera(QObject):
         self.ui = ui
 
         self.thread_show = QThread()
-        self.worker_show = None
+        self.video_handler = None
 
         self.thread_write = QThread()
         self.worker_write = None
@@ -54,12 +54,12 @@ class Camera(QObject):
 
         self.flag_capture = True
 
-        self.worker_show = VideoHandler(self)
-        self.worker_show.moveToThread(self.thread_show)
+        self.video_handler = VideoHandler(self)
+        self.video_handler.moveToThread(self.thread_show)
 
-        self.worker_show.paint_frame.connect(self.display_frame)
-        self.thread_show.started.connect(self.worker_show.run)
-        self.worker_show.show_fps.connect(self.show_fps)
+        self.video_handler.paint_frame.connect(self.display_frame)
+        self.thread_show.started.connect(self.video_handler.run)
+        self.video_handler.show_fps.connect(self.show_fps)
 
         self.thread_show.start()
 
@@ -98,8 +98,8 @@ class Camera(QObject):
         self.worker_write.moveToThread(self.thread_write)
 
         self.thread_write.started.connect(self.worker_write.open_file)
-        self.worker_show.record_frame.connect(self.worker_write.record)
-        self.worker_show.close_file.connect(self.worker_write.close_file)
+        self.video_handler.record_frame.connect(self.worker_write.record)
+        self.video_handler.close_file.connect(self.worker_write.close_file)
 
         self.thread_write.start()
 
@@ -114,8 +114,16 @@ class Camera(QObject):
 
     @pyqtSlot(float)
     def set_clipLimit_CLAHE(self, clipLimit):
-        self.worker_show.clipLimit = clipLimit
+        self.video_handler.clipLimit = clipLimit
 
     @pyqtSlot(int)
     def set_titleGridSize_CLAHE(self, titleGridSize):
-        self.worker_show.titleGridSize = titleGridSize
+        self.video_handler.titleGridSize = titleGridSize
+
+    @pyqtSlot(float)
+    def set_alpha_adjust(self, alpha):
+        self.video_handler.alpha = alpha
+
+    @pyqtSlot(int)
+    def set_beta_adjust(self, beta):
+        self.video_handler.beta = beta

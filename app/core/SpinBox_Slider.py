@@ -1,5 +1,4 @@
-from PyQt5.QtWidgets import QSpinBox, QSlider
-from PyQt5.QtCore import pyqtSlot
+from PyQt6.QtCore import pyqtSlot
 
 class SpinBox_Slider:
     def __init__(self, slider, spinbox, func, slider_value=0, spinbox_value=0, func_slider=None,
@@ -8,11 +7,12 @@ class SpinBox_Slider:
         self.slider = slider
 
         self.set(slider_value, spinbox_value)
+        self.set(slider_value, spinbox_value)
 
         self.spinbox.valueChanged.connect(func)
 
         self.spinbox.valueChanged.connect(lambda value: self.set_value(value, slider, func_slider))
-        self.slider.sliderMoved.connect(lambda value: self.set_value(value, spinbox, func_spinbox))
+        self.slider.valueChanged.connect(lambda value: self.set_value(value, spinbox, func_spinbox))
 
     def set(self, slider_value, spinbox_value):
         self.slider.setValue(slider_value)
@@ -31,3 +31,11 @@ class SpinBox_Slider:
     @staticmethod
     def dec2_float(value):
         return float(value / 2)
+
+    @staticmethod
+    def pow10_int(value):
+        return int(value * 10)
+
+    @staticmethod
+    def dec10_float(value):
+        return float(value / 10)

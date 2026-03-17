@@ -24,7 +24,7 @@ def apply_methods_to_image(image_path, output_dir="results"):
         # Методы улучшения контраста
         ("CLAHE", ContrastImprover.CLAHE, {"clipLimit": 4.0, "titleGridSizeX": 8, "titleGridSizeY": 8}),
         ("HE", ContrastImprover.HE, {}),
-        ("Retinex", ContrastImprover.Retinex, {"alpha": 2, "beta": 10}),
+        ("Retinex", ContrastImprover.adjust_contrast, {"alpha": 2, "beta": 10}),
         ("gamma_correction", ContrastImprover.gamma_correction, {"gamma": 1.5}),
         ("sigmoid_correction", ContrastImprover.sigmoid_correction, {"cutoff": 0.5, "gain": 10}),
         ("auto_gamma", ContrastImprover.auto_gamma, {}),

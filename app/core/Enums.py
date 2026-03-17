@@ -4,12 +4,12 @@ from enum import Enum
 class ContrastImprovement(Enum):
     NotImprove = 0
     CLAHE = 1
-    Retinex = 2
+    adjust_contrast = 2
     HE = 3
     gamma = 4
     autoGamma = 5
     sigmoid = 6
-    combined = 7
+    nn = 7
 
 
 class NoiseReduction(Enum):

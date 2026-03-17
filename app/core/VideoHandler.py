@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QImage, QPixmap
 import cv2
 import time
 from app.core.Enums import ContrastImprovement, NoiseReduction
@@ -15,8 +15,13 @@ class VideoHandler(QObject):
         self.current_frame = 0.0
         self.current_time = 0.0
 
+        # параметры для CLAHE
         self.clipLimit = 2
         self.titleGridSize = 4
+
+        # параметры для adjust
+        self.alpha = 1
+        self.beta = 0
 
 
     paint_frame = pyqtSignal(QPixmap)
@@ -39,6 +44,7 @@ class VideoHandler(QObject):
                     self.open_file.emit(self.camera.width, self.camera.height, self.camera.fps, self.camera.name)
 
                     #FIXME: в будущем класс Recorder должен с помощью сигнала сообщать об успехе открытия файла
+                    # и начинать отображать таймер записи, аналогично с окончанием записи видео
                     self.flag_open_file = True
 
                 if not self.camera.flag_record and self.flag_open_file and flag_try_close:
@@ -76,8 +82,8 @@ class VideoHandler(QObject):
                     case ContrastImprovement.CLAHE:
                         frame = ContrastImprover.CLAHE(frame, clipLimit=self.clipLimit, titleGridSizeX=self.titleGridSize,
                                                        titleGridSizeY=self.titleGridSize)
-                    case ContrastImprovement.Retinex:
-                        frame = ContrastImprover.Retinex(frame)
+                    case ContrastImprovement.adjust_contrast:
+                        frame = ContrastImprover.adjust_contrast(frame, alpha=self.alpha, beta=self.beta)
                     case ContrastImprovement.HE:
                         frame = ContrastImprover.HE(frame)
                     case ContrastImprovement.gamma:
@@ -86,14 +92,15 @@ class VideoHandler(QObject):
                         frame = ContrastImprover.auto_gamma(frame)
                     case ContrastImprovement.sigmoid:
                         frame = ContrastImprover.sigmoid_correction(frame)
-                    case ContrastImprovement.combined:
-                        frame = ContrastImprover.combined_enhancement(frame)
+                    case ContrastImprovement.nn:
+                        #TODO: Приделать модуль с нейросетью
+                        pass
                     case _:
                         pass
 
                 bytes_per_line = self.camera.channel * self.camera.width
 
-                q_image = QImage(frame.data, self.camera.width, self.camera.height, bytes_per_line, QImage.Format_RGB888)
+                q_image = QImage(frame.data, self.camera.width, self.camera.height, bytes_per_line, QImage.Format.Format_RGB888)
 
                 pixmap = QPixmap.fromImage(q_image)
 
