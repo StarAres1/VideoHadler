@@ -5,6 +5,8 @@ from PyQt6.QtCore import QThread
 from PyQt6.QtCore import pyqtSlot, QObject
 from PyQt6.QtGui import QPixmap
 from app.core.Enums import ContrastImprovement, NoiseReduction
+from PyQt6.QtWidgets import QCheckBox
+from PyQt6.QtCore import Qt
 
 class Camera(QObject):
     def __init__(self, index, name, video_frame, ui):
@@ -30,6 +32,11 @@ class Camera(QObject):
 
         self.method_for_contrast = ContrastImprovement.NotImprove
         self.method_for_noise = NoiseReduction.NotReduction
+
+        self.scaled_height = None
+        self.scaled_width = None
+        self.flag_scaled = True  # width / height
+        self.prop = None
 
     def set_method_for_contrast(self, method):
         self.method_for_contrast = method
@@ -71,7 +78,13 @@ class Camera(QObject):
 
     @pyqtSlot(QPixmap)
     def display_frame(self, pixmap):
-        self.video_frame.setPixmap(pixmap)
+        if pixmap is not None:
+            pixmap = pixmap.scaled(self.scaled_width, self.scaled_height,
+                                          Qt.AspectRatioMode.IgnoreAspectRatio,
+                                          Qt.TransformationMode.SmoothTransformation)
+            self.video_frame.setPixmap(pixmap)
+        self.video_frame.resize(self.scaled_width, self.scaled_width)
+
 
     @pyqtSlot(float)
     def show_fps(self, fps):
@@ -89,6 +102,10 @@ class Camera(QObject):
         self.height, self.width, self.channel = frame.shape
 
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+
+        self.scaled_height = self.height
+        self.scaled_width = self.width
+        self.prop = self.width / self.height
         return True
 
     def start_record(self):
@@ -127,3 +144,24 @@ class Camera(QObject):
     @pyqtSlot(int)
     def set_beta_adjust(self, beta):
         self.video_handler.beta = beta
+
+    @pyqtSlot(int)
+    def set_height(self, height):
+        self.scaled_height = height
+        if self.flag_scaled:
+            self.scaled_width = int(height * self.prop)
+
+    @pyqtSlot(int)
+    def set_width(self, width):
+        self.scaled_width = width
+        if self.flag_scaled:
+            self.scaled_height = int(width / self.prop)
+
+    @pyqtSlot()
+    def cancel_resize(self):
+        self.scaled_height = self.height
+        self.scaled_width = self.width
+
+    @pyqtSlot(bool)
+    def set_flag_prop(self, flag):
+        self.flag_scaled = flag

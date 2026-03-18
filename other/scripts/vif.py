@@ -99,7 +99,7 @@ def generate_enhanced_images(low_img):
         img = ContrastImprover.gamma_correction(low_img, gamma=gamma)
         specs.append((img, "gamma", {"gamma": round(gamma, 2)}))
 
-    # Сигмоидальная коррекция (оставлено 6 вариаций)
+    # Сигмоидальная коррекция (оставлено 7 вариаций)
     sigmoid_params = [
         (0.3, 8),
         (0.3, 10),
@@ -107,6 +107,7 @@ def generate_enhanced_images(low_img):
         (0.4, 10),
         (0.5, 10),
         (0.5, 12),
+        (0.5, 8),
     ]
     for cutoff, gain in sigmoid_params:
         img = ContrastImprover.sigmoid_correction(low_img, cutoff=cutoff, gain=gain)

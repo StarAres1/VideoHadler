@@ -3,9 +3,10 @@ from forms.main_window_ui import Ui_MainWindow
 import sys
 from PyQt6.QtWidgets import QMainWindow, QApplication
 from app.core.Enums import ContrastImprovement, NoiseReduction
-from PyQt6.QtCore import QFile, QTextStream
+from PyQt6.QtCore import QFile, QTextStream, QSize
 from app.core.MainWindow import *
 from app.core.MainWindow import MainWindow
+
 
 #TODO: добавить в CameraManager метод currentCamera
 def load_stylesheet(filename):
@@ -61,6 +62,18 @@ if __name__ == "__main__":
     # вызов диалоговых окон для методов улучшения контраста
     mainWindow.ui.bt_CLAHE.clicked.connect(mainWindow.show_dialog_CLAHE)
     mainWindow.ui.bt_adjust.clicked.connect(mainWindow.show_dialog_adjustContrast)
+
+    # настройка слайдеров для масштабирования изображения
+    mainWindow.sl_sp_height = SpinBox_Slider(mainWindow.ui.slider_height, mainWindow.ui.spB_height,
+                                             cameraManager.cameras[0].set_height, 480, 480)
+    mainWindow.sl_sp_width = SpinBox_Slider(mainWindow.ui.slider_width, mainWindow.ui.spB_width,
+                                            cameraManager.cameras[0].set_width, 640, 640)
+
+    # исходные настройки размеров
+    mainWindow.ui.bt_return.clicked.connect(cameraManager.cameras[0].cancel_resize)
+
+    # checkbox для сохранения пропорций
+    mainWindow.ui.ch_prop.toggled.connect(cameraManager.cameras[0].set_flag_prop)
 
     mainWindow.show()
     sys.exit(app.exec())

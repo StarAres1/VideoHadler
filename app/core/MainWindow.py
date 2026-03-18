@@ -15,6 +15,7 @@ class MainWindow(QMainWindow):
         self.camera = None
 
 
+
     @pyqtSlot()
     def show_dialog_CLAHE(self):
         self.dialog_clahe = QtWidgets.QDialog()
