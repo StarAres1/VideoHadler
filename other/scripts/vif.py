@@ -268,8 +268,8 @@ def main():
     parser.add_argument("--ref_dir", type=str, default="../half_ref", help="Папка с эталонными (оригинальными) изображениями")
     parser.add_argument("--output", type=str, default="format_ssim_contrasts.jsonl", help="Выходной файл в формате JSON Lines (по умолчанию best_methods.jsonl)")
     parser.add_argument("--ext", type=str, default=".png", help="Расширение файлов (по умолчанию .png)")
-    parser.add_argument("--start_num", type=int, default=1, help="Начинать обработку с изображений, чей номер референса не меньше указанного (по умолчанию 1)")
-    parser.add_argument("--end_num", type=int, default=None, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
+    parser.add_argument("--start_num", type=int, default=299, help="Начинать обработку с изображений, чей номер референса не меньше указанного (по умолчанию 1)")
+    parser.add_argument("--end_num", type=int, default=800, help="Заканчивать обработку на изображении с указанным номером (включительно). Если не задано, обрабатываются все от start_num и до конца.")
     args = parser.parse_args()
 
     # Получаем список искажённых файлов
