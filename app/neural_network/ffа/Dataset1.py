@@ -1,17 +1,9 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Subset
-from torchvision import transforms, models
-from PIL import Image
 import os
-import numpy as np
-import json
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
-import torch_directml
+from PIL import Image
+import torch.utils.data as data
 
-class ImageDataset(torch.utils.data.Dataset):
+
+class ImageDataset(data.Dataset):
     def __init__(self, root, transform=None, verbose=True):
         self.root = root
         self.transform = transform
@@ -19,43 +11,36 @@ class ImageDataset(torch.utils.data.Dataset):
         self.class_to_idx = {}
         self.files = []
 
-        # Проверяем существование папки
         if not os.path.exists(root):
             raise FileNotFoundError(f"Папка не найдена: {root}")
 
         if verbose:
             print(f"Сканируем папку: {root}")
 
-        # Обход подпапок
-        found_classes = 0
         for dir_name in sorted(os.listdir(root)):
             dir_path = os.path.join(root, dir_name)
             if not os.path.isdir(dir_path):
                 continue
-            found_classes += 1
-            if verbose:
-                print(f"  Найден класс: {dir_name}")
+
             idx = len(self.classes)
             self.class_to_idx[dir_name] = idx
             self.classes.append(dir_name)
 
-            # Собираем изображения
             count = 0
             for file_name in os.listdir(dir_path):
                 file_path = os.path.join(dir_path, file_name)
                 if os.path.isfile(file_path):
                     self.files.append((file_path, idx))
                     count += 1
+
             if verbose:
-                print(f"    Добавлено файлов: {count}")
+                print(f"  Найден класс: {dir_name} ({count} файлов)")
 
         self.labels = [label for _, label in self.files]
 
         if len(self.files) == 0:
-            raise RuntimeError(
-                f"В папке {root} не найдено изображений. "
-                "Убедитесь, что внутри есть подпапки (классы), а в них — файлы изображений."
-            )
+            raise RuntimeError(f"В папке {root} не найдено изображений.")
+
         if verbose:
             print(f"Всего классов: {len(self.classes)}")
             print(f"Всего изображений: {len(self.files)}")
@@ -65,7 +50,11 @@ class ImageDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         path, label = self.files[idx]
-        img = Image.open(path).convert('RGB')
+        img = Image.open(path)
+        # 'L' = 8-bit grayscale (1 канал)
+        img = img.convert('L')
+        # 'RGB' = создаем 3 идентичных канала для совместимости с ResNet
+        img = img.convert('RGB')
         if self.transform:
             img = self.transform(img)
         return img, label
