@@ -1,3 +1,4 @@
+import os
 import time
 
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -7,22 +8,37 @@ import cv2
 import numpy as np
 
 class Recorder(QObject):
-    def __init__(self, width, height, fps, name):
+    def __init__(self):
         super().__init__()
         self.output = None
         self.fourcc = None
         self.filename = None
 
+        self.name_camera = ""
+        self.width = 0
+        self.height = 0
+        self.fps = 30.0
+        self.video_format = "avi"
+
+
+    @pyqtSlot(int, int, float, str, str)
+    def open_file(self, width, height, fps, name, video_format):
+        self.width = int(width)
+        self.height = int(height)
+        self.fps = float(fps) if fps and fps > 0 else 30.0
         self.name_camera = name
-        self.width = width
-        self.height = height
-        self.fps = fps
+        self.video_format = (video_format or "avi").lower()
 
+        os.makedirs("video_output", exist_ok=True)
 
-    @pyqtSlot()
-    def open_file(self):
-        self.fourcc = cv2.VideoWriter_fourcc(*'XVID')   # для формата avi
-        self.filename = f'video_output/{self.name_camera.replace(" ", "_")}_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.avi'
+        if self.video_format == "mp4":
+            self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            extension = "mp4"
+        else:
+            self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            extension = "avi"
+
+        self.filename = f'video_output/{self.name_camera.replace(" ", "_")}_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.{extension}'
         print(self.filename)
         self.output = cv2.VideoWriter(
             self.filename,
@@ -46,5 +62,7 @@ class Recorder(QObject):
 
     @pyqtSlot()
     def close_file(self):
-        self.output.release()
-        print(f"Запись завершена в {time.time()}")
+        if self.output:
+            self.output.release()
+            self.output = None
+            print(f"Запись завершена в {time.time()}")

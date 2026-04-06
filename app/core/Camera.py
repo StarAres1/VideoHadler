@@ -5,7 +5,6 @@ from PyQt6.QtCore import QThread
 from PyQt6.QtCore import pyqtSlot, QObject
 from PyQt6.QtGui import QPixmap
 from app.core.Enums import ContrastImprovement, NoiseReduction
-from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtCore import Qt
 
 class Camera(QObject):
@@ -29,14 +28,16 @@ class Camera(QObject):
 
         self.flag_capture = None
         self.flag_record = None
+        self.record_format = "avi"
 
         self.method_for_contrast = ContrastImprovement.NotImprove
         self.method_for_noise = NoiseReduction.NotReduction
 
-        self.scaled_height = None
-        self.scaled_width = None
-        self.flag_scaled = True  # width / height
         self.prop = None
+        self.roi_x = 0
+        self.roi_y = 0
+        self.roi_width = 1
+        self.roi_height = 1
 
     def set_method_for_contrast(self, method):
         self.method_for_contrast = method
@@ -71,19 +72,21 @@ class Camera(QObject):
         self.thread_show.start()
 
     def stop_capture(self):
+        if self.flag_record:
+            self.stop_record()
         self.flag_capture = False
 
         if self.thread_show.isRunning():
             self.thread_show.quit()
+            self.thread_show.wait(500)
 
     @pyqtSlot(QPixmap)
     def display_frame(self, pixmap):
         if pixmap is not None:
-            pixmap = pixmap.scaled(self.scaled_width, self.scaled_height,
-                                          Qt.AspectRatioMode.IgnoreAspectRatio,
+            pixmap = pixmap.scaled(self.video_frame.size(),
+                                          Qt.AspectRatioMode.KeepAspectRatio,
                                           Qt.TransformationMode.SmoothTransformation)
             self.video_frame.setPixmap(pixmap)
-        self.video_frame.resize(self.scaled_width, self.scaled_width)
 
 
     @pyqtSlot(float)
@@ -103,18 +106,32 @@ class Camera(QObject):
 
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
 
-        self.scaled_height = self.height
-        self.scaled_width = self.width
         self.prop = self.width / self.height
+        self.roi_x = 0
+        self.roi_y = 0
+        self.roi_width = self.width
+        self.roi_height = self.height
         return True
 
-    def start_record(self):
-        self.flag_record = True
+    def _normalize_roi(self):
+        if not self.width or not self.height:
+            return
+        self.roi_x = max(0, min(int(self.roi_x), self.width - 1))
+        self.roi_y = max(0, min(int(self.roi_y), self.height - 1))
+        self.roi_width = max(1, min(int(self.roi_width), self.width - self.roi_x))
+        self.roi_height = max(1, min(int(self.roi_height), self.height - self.roi_y))
 
-        self.worker_write = Recorder(self.width, self.height, self.fps, self.name)
+    def start_record(self, video_format="avi"):
+        if not self.video_handler or not self.flag_capture:
+            return
+
+        self.flag_record = True
+        self.record_format = (video_format or "avi").lower()
+
+        self.worker_write = Recorder()
         self.worker_write.moveToThread(self.thread_write)
 
-        self.thread_write.started.connect(self.worker_write.open_file)
+        self.video_handler.open_file.connect(self.worker_write.open_file)
         self.video_handler.record_frame.connect(self.worker_write.record)
         self.video_handler.close_file.connect(self.worker_write.close_file)
 
@@ -128,6 +145,16 @@ class Camera(QObject):
         # close в Recorder успел выполниться
         self.thread_write.wait(1000)
         self.thread_write.quit()
+        self.thread_write.wait(500)
+
+        if self.video_handler and self.worker_write:
+            try:
+                self.video_handler.open_file.disconnect(self.worker_write.open_file)
+                self.video_handler.record_frame.disconnect(self.worker_write.record)
+                self.video_handler.close_file.disconnect(self.worker_write.close_file)
+            except Exception:
+                pass
+        self.worker_write = None
 
     @pyqtSlot(float)
     def set_clipLimit_CLAHE(self, clipLimit):
@@ -145,23 +172,76 @@ class Camera(QObject):
     def set_beta_adjust(self, beta):
         self.video_handler.beta = beta
 
-    @pyqtSlot(int)
-    def set_height(self, height):
-        self.scaled_height = height
-        if self.flag_scaled:
-            self.scaled_width = int(height * self.prop)
-
-    @pyqtSlot(int)
-    def set_width(self, width):
-        self.scaled_width = width
-        if self.flag_scaled:
-            self.scaled_height = int(width / self.prop)
-
-    @pyqtSlot()
-    def cancel_resize(self):
-        self.scaled_height = self.height
-        self.scaled_width = self.width
+    @pyqtSlot(str)
+    def set_record_format(self, video_format):
+        self.record_format = (video_format or "avi").lower()
 
     @pyqtSlot(bool)
-    def set_flag_prop(self, flag):
-        self.flag_scaled = flag
+    def set_he_color(self, value):
+        if self.video_handler:
+            self.video_handler.he_color = bool(value)
+
+    @pyqtSlot(float)
+    def set_gamma_value(self, value):
+        if self.video_handler:
+            self.video_handler.gamma = float(value)
+
+    @pyqtSlot(float)
+    def set_sigmoid_cutoff(self, value):
+        if self.video_handler:
+            self.video_handler.sigmoid_cutoff = float(value)
+
+    @pyqtSlot(float)
+    def set_sigmoid_gain(self, value):
+        if self.video_handler:
+            self.video_handler.sigmoid_gain = float(value)
+
+    @pyqtSlot(int)
+    def set_auto_gamma_target_brightness(self, value):
+        if self.video_handler:
+            self.video_handler.auto_gamma_target_brightness = int(value)
+
+    @pyqtSlot(bool)
+    def set_auto_gamma_color(self, value):
+        if self.video_handler:
+            self.video_handler.auto_gamma_color = bool(value)
+
+    @pyqtSlot(int)
+    def set_nn_skip_frames(self, value):
+        if self.video_handler:
+            self.video_handler.nn_skip_frames = int(value)
+
+    @pyqtSlot(int)
+    def set_median_ksize(self, value):
+        if self.video_handler:
+            self.video_handler.median_ksize = int(value)
+
+    @pyqtSlot(int)
+    def set_fast_gaussian_ksize(self, value):
+        if self.video_handler:
+            self.video_handler.fast_gaussian_ksize = int(value)
+
+    @pyqtSlot(float)
+    def set_fast_gaussian_sigma(self, value):
+        if self.video_handler:
+            self.video_handler.fast_gaussian_sigma = float(value)
+
+    @pyqtSlot(int)
+    def set_roi_x(self, value):
+        self.roi_x = int(value)
+        self._normalize_roi()
+
+    @pyqtSlot(int)
+    def set_roi_y(self, value):
+        self.roi_y = int(value)
+        self._normalize_roi()
+
+    @pyqtSlot(int)
+    def set_roi_width(self, value):
+        self.roi_width = int(value)
+        self._normalize_roi()
+
+    @pyqtSlot(int)
+    def set_roi_height(self, value):
+        self.roi_height = int(value)
+        self._normalize_roi()

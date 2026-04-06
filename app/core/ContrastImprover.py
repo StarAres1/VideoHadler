@@ -98,7 +98,7 @@ class ContrastImprover:
 
             # Расчёт гаммы: хотим привести медиану к target_brightness
             # gamma = log( current/255 ) / log( target/255 )
-            gamma = np.log(current_l / 255.0) / np.log(target_brightness / 255.0)
+            gamma = np.log(target_brightness / 255.0) / np.log(current_l / 255.0)
             gamma = np.clip(gamma, 0.2, 5.0)  # ограничиваем разумный диапазон
 
             # Применяем гамму только к L-каналу
@@ -124,7 +124,7 @@ class ContrastImprover:
             if current == 255:
                 current = 254
 
-            gamma = np.log(current / 255.0) / np.log(target_brightness / 255.0)
+            gamma = np.log(target_brightness / 255.0) / np.log(current / 255.0)
             gamma = np.clip(gamma, 0.2, 5.0)
 
             # Нормализация и коррекция
@@ -132,13 +132,3 @@ class ContrastImprover:
             img_corrected = adjust_gamma(img_norm, gamma=gamma)
             return (img_corrected * 255).astype(np.uint8)
 
-    @staticmethod
-    def combined_enhancement(frame, clip_limit=4.0, sigmoid_gain=8):
-
-        clahe_result = ContrastImprover.CLAHE(frame, clipLimit=clip_limit)
-
-        gamma_result = ContrastImprover.auto_gamma(clahe_result, color=True)
-
-        final_result = ContrastImprover.sigmoid_correction(gamma_result, gain=sigmoid_gain, color=True)
-
-        return final_result

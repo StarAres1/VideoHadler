@@ -18,4 +18,4 @@ class NoiseReduction(Enum):
     GaussianBlur = 2
     MedianBlur = 3
     BilateralFilter = 4
-    FastNlMeansDenoising = 5
+    FastGaussian = 5
