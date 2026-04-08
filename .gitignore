@@ -189,5 +189,6 @@ dataset/test
 dataset/train
 other
 !other/scripts
-dataset/half
+dataset
 screenshots
+scripts_for_ed_nn/results_markup
