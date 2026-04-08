@@ -53,6 +53,14 @@ class NNContrastSelector:
     def is_loading(self) -> bool:
         return self._is_loading
 
+    def _select_inference_device(self, torch):
+        # Prefer DirectML on Windows, fallback to CPU if unavailable.
+        try:
+            import torch_directml
+            return torch_directml.device(), "DirectML"
+        except Exception:
+            return torch.device("cpu"), "CPU"
+
     def ensure_loaded_with_progress(self, progress_cb: Callable[[int, str], None] | None = None):
         with self._lock:
             if self.model is not None:
@@ -99,10 +107,11 @@ class NNContrastSelector:
                 progress_cb(75, "Загрузка весов в модель...")
             self.model.load_state_dict(state_dict, strict=False)
             self.model.eval()
-            self.device = torch.device("cpu")
+            self.device, device_name = self._select_inference_device(torch)
             self.model = self.model.to(self.device)
 
             if progress_cb:
+                progress_cb(85, f"Устройство инференса: {device_name}")
                 progress_cb(90, "Подготовка преобразований...")
             self.transform = transforms.Compose([
                 transforms.Resize((224, 224)),
