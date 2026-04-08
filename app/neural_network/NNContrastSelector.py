@@ -84,8 +84,8 @@ class NNContrastSelector:
 
         if progress_cb:
             progress_cb(20, "Подготовка файлов модели...")
-        model_path = os.path.join("app", "neural_network", "change_cool", "saved_models", "best_model.pth")
-        mapping_path = os.path.join("app", "neural_network", "change_cool", "logs", "class_mapping.txt")
+        model_path = os.path.join("app", "neural_network", "models", "change_cool", "saved_models", "best_model.pth")
+        mapping_path = os.path.join("app", "neural_network", "models", "change_cool", "logs", "class_mapping.txt")
         if not os.path.exists(model_path):
             self.last_error = f"Файл модели не найден: {model_path}"
             self._is_loading = False

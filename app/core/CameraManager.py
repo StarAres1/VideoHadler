@@ -1,5 +1,7 @@
 from pygrabber.dshow_graph import FilterGraph
 from app.core.Camera import Camera
+
+
 class CameraManager:
     def __init__(self, video_frame, ui):
         self.cameras = []

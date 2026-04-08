@@ -4,7 +4,7 @@ import shutil
 
 # ================= НАСТРОЙКИ =================
 # Путь к файлу с метаданными
-JSONL_PATH = 'best_methods(huge_ssim_6)1.jsonl'
+JSONL_PATH = 'results_markup/best_methods(huge_ssim_6)1.jsonl'
 
 # Папка, где сейчас лежат исходные фотографии
 SOURCE_IMAGES_DIR = '../../dataset/half'
@@ -13,7 +13,7 @@ SOURCE_IMAGES_DIR = '../../dataset/half'
 DEST_ROOT_DIR = 'organized_images'
 
 # Имя выходного файла с картой папок
-OUTPUT_JSON_PATH = 'folder_mapping_huge_ssim_6.json'
+OUTPUT_JSON_PATH = 'results_markup/folder_mapping_huge_ssim_6.json'
 
 
 # =============================================

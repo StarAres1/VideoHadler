@@ -1,7 +1,7 @@
 import os
 import time
 
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, pyqtSlot
 from datetime import datetime
 from PyQt6.QtGui import QImage
 import cv2

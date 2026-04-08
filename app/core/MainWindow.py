@@ -5,11 +5,11 @@ from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QTimer, QEvent, QRect, Q
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QMainWindow
 from forms.main_window_ui import Ui_MainWindow
-from app.core.SpinBox_Slider import SpinBox_Slider
+from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
 
 from forms.dialog_clahe_ui import Ui_Dialog as ClaheWindow
 from forms.dialog_adjust_contrast_ui import Ui_Dialog as AdjustWindow
-from app.core.NNContrastSelector import NN_SELECTOR
+from app.neural_network.NNContrastSelector import NN_SELECTOR
 
 
 class NNModelLoadWorker(QObject):

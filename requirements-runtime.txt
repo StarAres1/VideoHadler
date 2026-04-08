@@ -1,0 +1,12 @@
+numpy
+opencv-contrib-python
+Pillow
+PyQt6
+PyQt6-Qt6
+PyQt6_sip
+pygrabber
+comtypes
+scikit-image
+torch
+torchvision
+torch-directml

@@ -158,19 +158,23 @@ class Camera(QObject):
 
     @pyqtSlot(float)
     def set_clipLimit_CLAHE(self, clipLimit):
-        self.video_handler.clipLimit = clipLimit
+        if self.video_handler:
+            self.video_handler.processor.config.clip_limit = float(clipLimit)
 
     @pyqtSlot(int)
     def set_titleGridSize_CLAHE(self, titleGridSize):
-        self.video_handler.titleGridSize = titleGridSize
+        if self.video_handler:
+            self.video_handler.processor.config.tile_grid_size = int(titleGridSize)
 
     @pyqtSlot(float)
     def set_alpha_adjust(self, alpha):
-        self.video_handler.alpha = alpha
+        if self.video_handler:
+            self.video_handler.processor.config.alpha = float(alpha)
 
     @pyqtSlot(int)
     def set_beta_adjust(self, beta):
-        self.video_handler.beta = beta
+        if self.video_handler:
+            self.video_handler.processor.config.beta = int(beta)
 
     @pyqtSlot(str)
     def set_record_format(self, video_format):
@@ -179,52 +183,57 @@ class Camera(QObject):
     @pyqtSlot(bool)
     def set_he_color(self, value):
         if self.video_handler:
-            self.video_handler.he_color = bool(value)
+            self.video_handler.processor.config.he_color = bool(value)
 
     @pyqtSlot(float)
     def set_gamma_value(self, value):
         if self.video_handler:
-            self.video_handler.gamma = float(value)
+            self.video_handler.processor.config.gamma = float(value)
 
     @pyqtSlot(float)
     def set_sigmoid_cutoff(self, value):
         if self.video_handler:
-            self.video_handler.sigmoid_cutoff = float(value)
+            self.video_handler.processor.config.sigmoid_cutoff = float(value)
 
     @pyqtSlot(float)
     def set_sigmoid_gain(self, value):
         if self.video_handler:
-            self.video_handler.sigmoid_gain = float(value)
+            self.video_handler.processor.config.sigmoid_gain = float(value)
 
     @pyqtSlot(int)
     def set_auto_gamma_target_brightness(self, value):
         if self.video_handler:
-            self.video_handler.auto_gamma_target_brightness = int(value)
+            self.video_handler.processor.config.auto_gamma_target_brightness = int(value)
 
     @pyqtSlot(bool)
     def set_auto_gamma_color(self, value):
         if self.video_handler:
-            self.video_handler.auto_gamma_color = bool(value)
+            self.video_handler.processor.config.auto_gamma_color = bool(value)
 
     @pyqtSlot(int)
     def set_nn_skip_frames(self, value):
         if self.video_handler:
-            self.video_handler.nn_skip_frames = int(value)
+            self.video_handler.processor.config.nn_skip_frames = int(value)
 
     @pyqtSlot(int)
     def set_median_ksize(self, value):
         if self.video_handler:
-            self.video_handler.median_ksize = int(value)
+            self.video_handler.processor.config.median_ksize = int(value)
 
     @pyqtSlot(int)
     def set_fast_gaussian_ksize(self, value):
         if self.video_handler:
-            self.video_handler.fast_gaussian_ksize = int(value)
+            self.video_handler.processor.config.fast_gaussian_ksize = int(value)
 
     @pyqtSlot(float)
     def set_fast_gaussian_sigma(self, value):
         if self.video_handler:
-            self.video_handler.fast_gaussian_sigma = float(value)
+            self.video_handler.processor.config.fast_gaussian_sigma = float(value)
+
+    @pyqtSlot(bool)
+    def set_monochrome(self, value):
+        if self.video_handler:
+            self.video_handler.processor.config.monochrome = bool(value)
 
     @pyqtSlot(int)
     def set_roi_x(self, value):

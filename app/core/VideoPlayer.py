@@ -9,9 +9,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from app.core.Enums import ContrastImprovement, NoiseReduction
-from app.core.ContrastImprover import ContrastImprover
-from app.core.QualityImprover import QualityImprover
-from app.core.NNContrastSelector import NN_SELECTOR
+from app.core.FrameProcessor import FrameProcessor
 
 
 class VideoPlayer(QObject):
@@ -39,28 +37,11 @@ class VideoPlayer(QObject):
 
         self.method_for_contrast = ContrastImprovement.NotImprove
         self.method_for_noise = NoiseReduction.NotReduction
-        self.clipLimit = 2
-        self.titleGridSize = 4
-        self.alpha = 1
-        self.beta = 0
-        self.gamma = 1.5
-        self.sigmoid_cutoff = 0.5
-        self.sigmoid_gain = 12.0
-        self.auto_gamma_target_brightness = 128
-        self.auto_gamma_color = True
-        self.he_color = True
-        self.median_ksize = 3
-        self.fast_gaussian_ksize = 3
-        self.fast_gaussian_sigma = 1.0
+        self.processor = FrameProcessor()
         self.roi_x = 0
         self.roi_y = 0
         self.roi_width = 1
         self.roi_height = 1
-
-        self.nn_skip_frames = 0
-        self._nn_skip_counter = 0
-        self._nn_last_label = ""
-        self.nn_selector = NN_SELECTOR
 
         self._fps_frame_acc = 0
         self._fps_window_start = time.perf_counter()
@@ -113,20 +94,6 @@ class VideoPlayer(QObject):
             "roi_h": self.roi_height,
             "noise": self.method_for_noise,
             "contrast": self.method_for_contrast,
-            "median_ksize": self.median_ksize,
-            "fast_k": self.fast_gaussian_ksize,
-            "fast_sigma": self.fast_gaussian_sigma,
-            "clip": self.clipLimit,
-            "tile": self.titleGridSize,
-            "alpha": self.alpha,
-            "beta": self.beta,
-            "he_color": self.he_color,
-            "gamma": self.gamma,
-            "auto_target": self.auto_gamma_target_brightness,
-            "auto_color": self.auto_gamma_color,
-            "sig_cutoff": self.sigmoid_cutoff,
-            "sig_gain": self.sigmoid_gain,
-            "nn_skip": self.nn_skip_frames,
         }
 
     def _process_frame(self, frame_bgr, p):
@@ -144,36 +111,17 @@ class VideoPlayer(QObject):
         if roi_frame.size != 0:
             frame_rgb = cv2.resize(roi_frame, (width, height), interpolation=cv2.INTER_LINEAR)
 
-        if p["noise"] == NoiseReduction.MedianBlur:
-            frame_rgb = QualityImprover.medianBlur(frame_rgb, int(p["median_ksize"]))
-        elif p["noise"] == NoiseReduction.FastGaussian:
-            frame_rgb = QualityImprover.fast_gaussian(frame_rgb, int(p["fast_k"]), float(p["fast_sigma"]))
-
-        m = p["contrast"]
-        if m == ContrastImprovement.CLAHE:
-            frame_rgb = ContrastImprover.CLAHE(frame_rgb, clipLimit=float(p["clip"]), titleGridSizeX=int(p["tile"]), titleGridSizeY=int(p["tile"]))
-        elif m == ContrastImprovement.adjust_contrast:
-            frame_rgb = ContrastImprover.adjust_contrast(frame_rgb, alpha=float(p["alpha"]), beta=int(p["beta"]))
-        elif m == ContrastImprovement.HE:
-            frame_rgb = ContrastImprover.HE(frame_rgb, color=bool(p["he_color"]))
-        elif m == ContrastImprovement.gamma:
-            frame_rgb = ContrastImprover.gamma_correction(frame_rgb, gamma=float(p["gamma"]))
-        elif m == ContrastImprovement.autoGamma:
-            frame_rgb = ContrastImprover.auto_gamma(frame_rgb, color=bool(p["auto_color"]), target_brightness=int(p["auto_target"]))
-        elif m == ContrastImprovement.sigmoid:
-            frame_rgb = ContrastImprover.sigmoid_correction(frame_rgb, cutoff=float(p["sig_cutoff"]), gain=float(p["sig_gain"]))
-        elif m == ContrastImprovement.nn:
-            if self._nn_skip_counter <= 0 or not self._nn_last_label:
-                predicted = self.nn_selector.predict_label(frame_rgb)
-                if predicted:
-                    self._nn_last_label = predicted
-                self._nn_skip_counter = max(0, int(p["nn_skip"]))
-            else:
-                self._nn_skip_counter -= 1
-            if self._nn_last_label:
-                frame_rgb = self.nn_selector.apply_label(frame_rgb, self._nn_last_label)
-
-        return frame_rgb
+        return self.processor.process(
+            frame_rgb,
+            width,
+            height,
+            roi_x,
+            roi_y,
+            roi_w,
+            roi_h,
+            p["contrast"],
+            p["noise"],
+        )
 
     @pyqtSlot(object)
     def _set_rendered_frame(self, frame_rgb):
@@ -294,20 +242,21 @@ class VideoPlayer(QObject):
 
     def set_method_for_contrast(self, method): self.method_for_contrast = method; self.refresh_current_frame()
     def set_method_for_noise(self, method): self.method_for_noise = method; self.refresh_current_frame()
-    def set_clipLimit_CLAHE(self, value): self.clipLimit = value; self.refresh_current_frame()
-    def set_titleGridSize_CLAHE(self, value): self.titleGridSize = value; self.refresh_current_frame()
-    def set_alpha_adjust(self, value): self.alpha = value; self.refresh_current_frame()
-    def set_beta_adjust(self, value): self.beta = value; self.refresh_current_frame()
-    def set_he_color(self, value): self.he_color = bool(value); self.refresh_current_frame()
-    def set_gamma_value(self, value): self.gamma = value; self.refresh_current_frame()
-    def set_sigmoid_cutoff(self, value): self.sigmoid_cutoff = value; self.refresh_current_frame()
-    def set_sigmoid_gain(self, value): self.sigmoid_gain = value; self.refresh_current_frame()
-    def set_auto_gamma_target_brightness(self, value): self.auto_gamma_target_brightness = value; self.refresh_current_frame()
-    def set_auto_gamma_color(self, value): self.auto_gamma_color = bool(value); self.refresh_current_frame()
-    def set_nn_skip_frames(self, value): self.nn_skip_frames = int(value); self.refresh_current_frame()
-    def set_median_ksize(self, value): self.median_ksize = int(value); self.refresh_current_frame()
-    def set_fast_gaussian_ksize(self, value): self.fast_gaussian_ksize = int(value); self.refresh_current_frame()
-    def set_fast_gaussian_sigma(self, value): self.fast_gaussian_sigma = float(value); self.refresh_current_frame()
+    def set_clipLimit_CLAHE(self, value): self.processor.config.clip_limit = float(value); self.refresh_current_frame()
+    def set_titleGridSize_CLAHE(self, value): self.processor.config.tile_grid_size = int(value); self.refresh_current_frame()
+    def set_alpha_adjust(self, value): self.processor.config.alpha = float(value); self.refresh_current_frame()
+    def set_beta_adjust(self, value): self.processor.config.beta = int(value); self.refresh_current_frame()
+    def set_he_color(self, value): self.processor.config.he_color = bool(value); self.refresh_current_frame()
+    def set_gamma_value(self, value): self.processor.config.gamma = float(value); self.refresh_current_frame()
+    def set_sigmoid_cutoff(self, value): self.processor.config.sigmoid_cutoff = float(value); self.refresh_current_frame()
+    def set_sigmoid_gain(self, value): self.processor.config.sigmoid_gain = float(value); self.refresh_current_frame()
+    def set_auto_gamma_target_brightness(self, value): self.processor.config.auto_gamma_target_brightness = int(value); self.refresh_current_frame()
+    def set_auto_gamma_color(self, value): self.processor.config.auto_gamma_color = bool(value); self.refresh_current_frame()
+    def set_nn_skip_frames(self, value): self.processor.config.nn_skip_frames = int(value); self.refresh_current_frame()
+    def set_median_ksize(self, value): self.processor.config.median_ksize = int(value); self.refresh_current_frame()
+    def set_fast_gaussian_ksize(self, value): self.processor.config.fast_gaussian_ksize = int(value); self.refresh_current_frame()
+    def set_fast_gaussian_sigma(self, value): self.processor.config.fast_gaussian_sigma = float(value); self.refresh_current_frame()
+    def set_monochrome(self, value): self.processor.config.monochrome = bool(value); self.refresh_current_frame()
     def set_roi_x(self, value): self.roi_x = int(value); self.refresh_current_frame()
     def set_roi_y(self, value): self.roi_y = int(value); self.refresh_current_frame()
     def set_roi_width(self, value): self.roi_width = int(value); self.refresh_current_frame()

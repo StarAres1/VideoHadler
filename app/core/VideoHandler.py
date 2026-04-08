@@ -2,10 +2,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QImage, QPixmap
 import cv2
 import time
-from app.core.Enums import ContrastImprovement, NoiseReduction
-from app.core.ContrastImprover import ContrastImprover
-from app.core.QualityImprover import QualityImprover
-from app.core.NNContrastSelector import NN_SELECTOR
+from app.core.FrameProcessor import FrameProcessor
 
 class VideoHandler(QObject):
     def __init__(self, camera):
@@ -16,30 +13,7 @@ class VideoHandler(QObject):
         self.current_frame = 0.0
         self.current_time = 0.0
 
-        # параметры для CLAHE
-        self.clipLimit = 2
-        self.titleGridSize = 4
-
-        # параметры для adjust
-        self.alpha = 1
-        self.beta = 0
-
-        # параметры для gamma / sigmoid / auto gamma / HE
-        self.gamma = 1.5
-        self.sigmoid_cutoff = 0.5
-        self.sigmoid_gain = 12.0
-        self.auto_gamma_target_brightness = 128
-        self.auto_gamma_color = True
-        self.he_color = True
-
-        # параметры подавления шума
-        self.median_ksize = 3
-        self.fast_gaussian_ksize = 3
-        self.fast_gaussian_sigma = 1.0
-        self.nn_skip_frames = 0
-        self._nn_skip_counter = 0
-        self._nn_last_label = ""
-        self.nn_selector = NN_SELECTOR
+        self.processor = FrameProcessor()
 
 
     paint_frame = pyqtSignal(QPixmap)
@@ -101,58 +75,17 @@ class VideoHandler(QObject):
                 if roi_frame.size != 0:
                     frame = cv2.resize(roi_frame, (self.camera.width, self.camera.height), interpolation=cv2.INTER_LINEAR)
 
-                # секция методов подавления шума
-                match self.camera.method_for_noise:
-                    case NoiseReduction.NotReduction:
-                        pass
-                    case NoiseReduction.MedianBlur:
-                        frame = QualityImprover.medianBlur(frame, self.median_ksize)
-                    case NoiseReduction.FastGaussian:
-                        frame = QualityImprover.fast_gaussian(
-                            frame,
-                            ksize=self.fast_gaussian_ksize,
-                            sigma=self.fast_gaussian_sigma
-                        )
-                    case _:
-                        pass
-
-                # секция методов улучшения контраста
-                match self.camera.method_for_contrast:
-                    case ContrastImprovement.NotImprove:
-                        pass
-                    case ContrastImprovement.CLAHE:
-                        frame = ContrastImprover.CLAHE(frame, clipLimit=self.clipLimit, titleGridSizeX=self.titleGridSize,
-                                                       titleGridSizeY=self.titleGridSize)
-                    case ContrastImprovement.adjust_contrast:
-                        frame = ContrastImprover.adjust_contrast(frame, alpha=self.alpha, beta=self.beta)
-                    case ContrastImprovement.HE:
-                        frame = ContrastImprover.HE(frame, color=self.he_color)
-                    case ContrastImprovement.gamma:
-                        frame = ContrastImprover.gamma_correction(frame, gamma=self.gamma)
-                    case ContrastImprovement.autoGamma:
-                        frame = ContrastImprover.auto_gamma(
-                            frame,
-                            color=self.auto_gamma_color,
-                            target_brightness=self.auto_gamma_target_brightness
-                        )
-                    case ContrastImprovement.sigmoid:
-                        frame = ContrastImprover.sigmoid_correction(
-                            frame,
-                            cutoff=self.sigmoid_cutoff,
-                            gain=self.sigmoid_gain
-                        )
-                    case ContrastImprovement.nn:
-                        if self._nn_skip_counter <= 0 or not self._nn_last_label:
-                            predicted = self.nn_selector.predict_label(frame)
-                            if predicted:
-                                self._nn_last_label = predicted
-                            self._nn_skip_counter = max(0, int(self.nn_skip_frames))
-                        else:
-                            self._nn_skip_counter -= 1
-                        if self._nn_last_label:
-                            frame = self.nn_selector.apply_label(frame, self._nn_last_label)
-                    case _:
-                        pass
+                frame = self.processor.process(
+                    frame,
+                    self.camera.width,
+                    self.camera.height,
+                    self.camera.roi_x,
+                    self.camera.roi_y,
+                    self.camera.roi_width,
+                    self.camera.roi_height,
+                    self.camera.method_for_contrast,
+                    self.camera.method_for_noise,
+                )
 
                 bytes_per_line = self.camera.channel * self.camera.width
 

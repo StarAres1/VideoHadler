@@ -107,6 +107,61 @@
         </size>
        </property>
        <layout class="QGridLayout" name="gridLayout_5">
+        <item row="3" column="0">
+         <widget class="QGroupBox" name="group_enhancement">
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
+          <property name="title">
+           <string>Настройки подавления шума</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="r_MedianBlur">
+             <property name="text">
+              <string>Медианный фильтр</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QRadioButton" name="r_FastNlMeansDenoising">
+             <property name="text">
+              <string>Быстрое гауссово шумоподавление</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QToolButton" name="toolButton_8">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QToolButton" name="toolButton_3">
+             <property name="text">
+              <string>...</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QRadioButton" name="r_NotReductionNoise">
+             <property name="text">
+              <string>Нет</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
         <item row="0" column="0">
          <widget class="QTabWidget" name="tabWidget">
           <property name="sizePolicy">
@@ -309,7 +364,7 @@
           </widget>
          </widget>
         </item>
-        <item row="5" column="0">
+        <item row="6" column="0">
          <widget class="QGroupBox" name="groupBox_ROI">
           <property name="font">
            <font>
@@ -407,62 +462,31 @@
           </layout>
          </widget>
         </item>
-        <item row="2" column="0">
-         <widget class="QGroupBox" name="group_enhancement">
+        <item row="7" column="0">
+         <widget class="QGroupBox" name="groupBox_4">
           <property name="font">
            <font>
             <pointsize>12</pointsize>
            </font>
           </property>
           <property name="title">
-           <string>Настройки подавления шума</string>
+           <string>Другое</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignmentFlag::AlignCenter</set>
           </property>
-          <layout class="QGridLayout" name="gridLayout_3">
-           <item row="1" column="0">
-            <widget class="QRadioButton" name="r_MedianBlur">
+          <layout class="QVBoxLayout" name="verticalLayout_3">
+           <item>
+            <widget class="QCheckBox" name="ch_monochrome">
              <property name="text">
-              <string>Медианный фильтр</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QRadioButton" name="r_FastNlMeansDenoising">
-             <property name="text">
-              <string>Быстрое гауссово шумоподавление</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="1">
-            <widget class="QToolButton" name="toolButton_8">
-             <property name="text">
-              <string>...</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QToolButton" name="toolButton_3">
-             <property name="text">
-              <string>...</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QRadioButton" name="r_NotReductionNoise">
-             <property name="text">
-              <string>Нет</string>
-             </property>
-             <property name="checked">
-              <bool>true</bool>
+              <string>Монохромное видео</string>
              </property>
             </widget>
            </item>
           </layout>
          </widget>
         </item>
-        <item row="1" column="0">
+        <item row="2" column="0">
          <widget class="QGroupBox" name="group_contrast_enhancement">
           <property name="font">
            <font>
