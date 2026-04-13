@@ -18,7 +18,7 @@ class VideoPlayer(QObject):
     playback_state_changed = pyqtSignal(bool)
     file_opened = pyqtSignal(str)
     show_fps = pyqtSignal(float)
-    frame_ready = pyqtSignal(object)
+    frame_ready = pyqtSignal(object, bool)
 
     def __init__(self, label_record_format: QLabel):
         super().__init__()
@@ -76,7 +76,7 @@ class VideoPlayer(QObject):
             self.roi_height = self.height
         self.show_roi_content = False
 
-        interval = int(1000 / fps) if fps > 0 else 33
+        interval = max(1, int(round(1000.0 / fps))) if fps > 0 else 33
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
         self.timer.start(interval)
@@ -139,8 +139,8 @@ class VideoPlayer(QObject):
             p["noise"],
         )
 
-    @pyqtSlot(object)
-    def _set_rendered_frame(self, frame_rgb):
+    @pyqtSlot(object, bool)
+    def _set_rendered_frame(self, frame_rgb, count_for_playback_fps):
         if frame_rgb is None:
             return
         h, w, ch = frame_rgb.shape
@@ -150,22 +150,34 @@ class VideoPlayer(QObject):
         scaled = pixmap.scaled(self.label_record_format.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.label_record_format.setPixmap(scaled)
         self.current_frame = frame_rgb.copy()
+        if count_for_playback_fps:
+            self._fps_frame_acc += 1
+            now = time.perf_counter()
+            elapsed = now - self._fps_window_start
+            if elapsed >= 1.0:
+                self.show_fps.emit(self._fps_frame_acc / elapsed)
+                self._fps_window_start = now
+                self._fps_frame_acc = 0
 
-    def _render_current_frame_async(self):
+    def _render_current_frame_async(self, count_for_playback_fps: bool = False):
         if self.raw_frame is None:
             return
         if self._render_future and not self._render_future.done():
             return
         frame = self.raw_frame.copy()
         params = self._snapshot_params()
-        self._render_future = self._render_executor.submit(self._process_frame, frame, params)
+
+        def _task():
+            return self._process_frame(frame, params)
+
+        self._render_future = self._render_executor.submit(_task)
 
         def _done(fut):
             try:
                 out = fut.result()
             except Exception:
                 out = None
-            self.frame_ready.emit(out)
+            self.frame_ready.emit(out, count_for_playback_fps)
 
         self._render_future.add_done_callback(_done)
 
@@ -175,15 +187,8 @@ class VideoPlayer(QObject):
             self.pause()
             return
         self.raw_frame = frame.copy()
-        self._render_current_frame_async()
+        self._render_current_frame_async(count_for_playback_fps=True)
         self._emit_progress()
-        self._fps_frame_acc += 1
-        now = time.perf_counter()
-        elapsed = now - self._fps_window_start
-        if elapsed >= 1.0:
-            self.show_fps.emit(self._fps_frame_acc / elapsed)
-            self._fps_window_start = now
-            self._fps_frame_acc = 0
 
     def _emit_progress(self):
         if not self.cap:
@@ -225,6 +230,8 @@ class VideoPlayer(QObject):
         if self.timer and not self.timer.isActive():
             self.timer.start()
         self._is_playing = True
+        self._fps_frame_acc = 0
+        self._fps_window_start = time.perf_counter()
         self.playback_state_changed.emit(True)
 
     def seek_seconds(self, seconds: int):
