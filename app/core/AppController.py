@@ -166,8 +166,11 @@ class AppController:
         cam = self.main.camera
         if not cam and not (self.main.videoPlayer and self.main.videoPlayer.is_loaded()):
             return
-        frame_w = cam.width if cam and cam.width else (self.main.videoPlayer.width if self.main.videoPlayer else 640)
-        frame_h = cam.height if cam and cam.height else (self.main.videoPlayer.height if self.main.videoPlayer else 480)
+        frame_w, frame_h = self.main.active_native_frame_size()
+        if frame_w < 1:
+            frame_w = 640
+        if frame_h < 1:
+            frame_h = 480
         x = self.main.ui.spin_roi_x.value()
         y = self.main.ui.spin_roi_y.value()
         max_x = max(0, frame_w - 1)
@@ -262,3 +265,4 @@ class AppController:
         self.main.ui.button_take_screenshot.clicked.connect(self.main.make_video_screenshot)
         self.main.ui.slider_playback_position.valueChanged.connect(self.main.set_video_position)
         self.main.ui.button_toggle_roi_display.toggled.connect(self._on_toggle_roi_display)
+        self.main.videoPlayer.file_opened.connect(lambda _path: self._update_roi_limits())

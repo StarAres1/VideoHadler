@@ -110,23 +110,45 @@ class MainWindow(QMainWindow):
     def set_roi_change_callback(self, callback):
         self.roi_change_callback = callback
 
+    def active_native_frame_size(self) -> tuple[int, int]:
+        """Размер кадра в пикселях активного источника: только захват с камеры или только файл."""
+        if self.camera is not None and bool(getattr(self.camera, "flag_capture", False)):
+            w, h = self.camera.width, self.camera.height
+            if w and h:
+                return int(w), int(h)
+        if self.videoPlayer is not None and self.videoPlayer.is_loaded():
+            w, h = self.videoPlayer.width, self.videoPlayer.height
+            if w and h:
+                return int(w), int(h)
+        return (0, 0)
+
+    def _roi_overlay_parent_widget(self):
+        """Родитель рамок — не сам QLabel: дочерние виджеты в QLabel сдвигают отрисовку pixmap вверх."""
+        lbl = self.ui.video_frame_label
+        return lbl.parentWidget() if lbl.parentWidget() is not None else lbl
+
+    def _map_roi_rect_label_to_overlay_parent(self, rect: QRect) -> QRect:
+        lbl = self.ui.video_frame_label
+        parent = self._roi_overlay_parent_widget()
+        if parent is lbl:
+            return rect
+        top_left = lbl.mapToParent(rect.topLeft())
+        return QRect(top_left.x(), top_left.y(), rect.width(), rect.height())
+
     def _init_roi_overlay_frames(self):
         style = "QFrame { background: transparent; border: 2px solid #00AA00; }"
-        self._roi_box_frame = QtWidgets.QFrame(self.ui.video_frame_label)
+        overlay_parent = self._roi_overlay_parent_widget()
+        self._roi_box_frame = QtWidgets.QFrame(overlay_parent)
         self._roi_box_frame.setStyleSheet(style)
         self._roi_box_frame.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._roi_box_frame.hide()
-        self._roi_drag_frame = QtWidgets.QFrame(self.ui.video_frame_label)
+        self._roi_drag_frame = QtWidgets.QFrame(overlay_parent)
         self._roi_drag_frame.setStyleSheet(style)
         self._roi_drag_frame.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._roi_drag_frame.hide()
 
     def _frame_pixel_size(self):
-        if self.camera and getattr(self.camera, "width", None) and getattr(self.camera, "height", None):
-            return int(self.camera.width), int(self.camera.height)
-        if self.videoPlayer and self.videoPlayer.is_loaded() and self.videoPlayer.width and self.videoPlayer.height:
-            return int(self.videoPlayer.width), int(self.videoPlayer.height)
-        return 0, 0
+        return self.active_native_frame_size()
 
     def _video_pixmap_rect_in_label(self):
         pix = self.ui.video_frame_label.pixmap()
@@ -192,7 +214,7 @@ class MainWindow(QMainWindow):
         if geo.width() < 2 or geo.height() < 2:
             self._roi_box_frame.hide()
             return
-        self._roi_box_frame.setGeometry(geo)
+        self._roi_box_frame.setGeometry(self._map_roi_rect_label_to_overlay_parent(geo))
         self._roi_box_frame.show()
         self._roi_box_frame.raise_()
 
@@ -206,8 +228,7 @@ class MainWindow(QMainWindow):
         self.set_roi_content_display_active(False)
 
     def disable_roi(self):
-        width = self.camera.width if self.camera and self.camera.width else (self.videoPlayer.width if self.videoPlayer else 0)
-        height = self.camera.height if self.camera and self.camera.height else (self.videoPlayer.height if self.videoPlayer else 0)
+        width, height = self.active_native_frame_size()
         if not width or not height or not self.roi_controls:
             return
         if hasattr(self.ui, "button_toggle_roi_display"):
@@ -227,8 +248,7 @@ class MainWindow(QMainWindow):
         self.refresh_roi_overlay()
 
     def _apply_roi_from_mouse_rect(self, rect: QRect):
-        width = self.camera.width if self.camera and self.camera.width else (self.videoPlayer.width if self.videoPlayer else 0)
-        height = self.camera.height if self.camera and self.camera.height else (self.videoPlayer.height if self.videoPlayer else 0)
+        width, height = self.active_native_frame_size()
         if not width or not height or not self.roi_controls:
             return
         if rect.width() < 4 or rect.height() < 4:
@@ -282,14 +302,14 @@ class MainWindow(QMainWindow):
                 return super().eventFilter(obj, event)
             if event.type() == QEvent.Type.MouseButtonPress and event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self._rb_origin = event.pos()
-                self._roi_drag_frame.setGeometry(QRect(self._rb_origin, QSize()))
+                self._roi_drag_frame.setGeometry(self._map_roi_rect_label_to_overlay_parent(QRect(self._rb_origin, QSize())))
                 self._roi_drag_frame.show()
                 self._roi_drag_frame.raise_()
                 return True
             if event.type() == QEvent.Type.MouseMove and self._rb_origin is not None:
                 r = QRect(self._rb_origin, event.pos()).normalized()
                 r = self._clamp_rect_to_video_area(r)
-                self._roi_drag_frame.setGeometry(r)
+                self._roi_drag_frame.setGeometry(self._map_roi_rect_label_to_overlay_parent(r))
                 return True
             if event.type() == QEvent.Type.MouseButtonRelease and event.button() == QtCore.Qt.MouseButton.LeftButton:
                 if self._rb_origin is not None:

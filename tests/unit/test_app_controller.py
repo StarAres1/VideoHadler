@@ -89,6 +89,7 @@ def make_main_mock(camera=None):
     main.video_seek_forward = MagicMock()
     main.make_video_screenshot = MagicMock()
     main.set_video_position = MagicMock()
+    main.active_native_frame_size = MagicMock(return_value=(640, 480))
     main.tree = MagicMock()
     main.tree.video_selected = MagicMock()
     main.tree.video_selected.connect = MagicMock()
@@ -195,6 +196,7 @@ def test_update_roi_limits_with_video_player_only(patched_deps):
     vp.width = 320
     vp.height = 240
     main.videoPlayer = vp
+    main.active_native_frame_size = MagicMock(return_value=(320, 240))
     main.ui.spin_roi_x.value.return_value = 0
     main.ui.spin_roi_y.value.return_value = 0
     main.ui.spin_roi_w.value.return_value = 100

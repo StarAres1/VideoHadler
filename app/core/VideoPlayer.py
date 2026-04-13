@@ -64,7 +64,6 @@ class VideoPlayer(QObject):
         fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.duration_ms = (frame_count / fps) * 1000.0 if fps > 0 and frame_count > 0 else 0.0
 
-        self.file_opened.emit(file_path)
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
         if width > 0 and height > 0:
@@ -85,6 +84,8 @@ class VideoPlayer(QObject):
         self.playback_state_changed.emit(True)
         self._fps_window_start = time.perf_counter()
         self._fps_frame_acc = 0
+
+        self.file_opened.emit(file_path)
 
     def _snapshot_params(self):
         return {
