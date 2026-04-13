@@ -38,6 +38,7 @@ class Camera(QObject):
         self.roi_y = 0
         self.roi_width = 1
         self.roi_height = 1
+        self.show_roi_content = False
 
     def set_method_for_contrast(self, method):
         self.method_for_contrast = method
@@ -111,6 +112,7 @@ class Camera(QObject):
         self.roi_y = 0
         self.roi_width = self.width
         self.roi_height = self.height
+        self.show_roi_content = False
         return True
 
     def _normalize_roi(self):

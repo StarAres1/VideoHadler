@@ -42,6 +42,7 @@ class VideoPlayer(QObject):
         self.roi_y = 0
         self.roi_width = 1
         self.roi_height = 1
+        self.show_roi_content = False
 
         self._fps_frame_acc = 0
         self._fps_window_start = time.perf_counter()
@@ -74,6 +75,7 @@ class VideoPlayer(QObject):
             self.roi_y = 0
             self.roi_width = self.width
             self.roi_height = self.height
+        self.show_roi_content = False
 
         interval = int(1000 / fps) if fps > 0 else 33
         self.timer = QTimer()
@@ -94,6 +96,7 @@ class VideoPlayer(QObject):
             "roi_h": self.roi_height,
             "noise": self.method_for_noise,
             "contrast": self.method_for_contrast,
+            "show_roi_content": self.show_roi_content,
         }
 
     def _process_frame(self, frame_bgr, p):
@@ -107,18 +110,30 @@ class VideoPlayer(QObject):
         roi_y = max(0, min(int(p["roi_y"]), max(0, height - 1)))
         roi_w = max(1, min(int(p["roi_w"]), max(1, width - roi_x)))
         roi_h = max(1, min(int(p["roi_h"]), max(1, height - roi_y)))
-        roi_frame = frame_rgb[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
-        if roi_frame.size != 0:
-            frame_rgb = cv2.resize(roi_frame, (width, height), interpolation=cv2.INTER_LINEAR)
-
+        if p.get("show_roi_content"):
+            roi_frame = frame_rgb[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
+            if roi_frame.size == 0:
+                return None
+            rw, rh = roi_frame.shape[1], roi_frame.shape[0]
+            return self.processor.process(
+                roi_frame,
+                rw,
+                rh,
+                0,
+                0,
+                rw,
+                rh,
+                p["contrast"],
+                p["noise"],
+            )
         return self.processor.process(
             frame_rgb,
             width,
             height,
-            roi_x,
-            roi_y,
-            roi_w,
-            roi_h,
+            0,
+            0,
+            width,
+            height,
             p["contrast"],
             p["noise"],
         )
@@ -289,5 +304,6 @@ class VideoPlayer(QObject):
         self.playback_state_changed.emit(False)
         self.position_changed.emit(0)
         self.time_changed.emit("0:00:00")
+        self.show_roi_content = False
         if self.label_record_format:
             self.label_record_format.clear()

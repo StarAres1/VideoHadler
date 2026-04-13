@@ -61,31 +61,34 @@ class VideoHandler(QObject):
                 frame = cv2.flip(frame, 1)
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-                # Применяем ROI к потоку отображения и обработке.
-                # После вырезания масштабируем обратно до исходного размера кадра.
-                roi_x = max(0, min(self.camera.roi_x, self.camera.width - 1))
-                roi_y = max(0, min(self.camera.roi_y, self.camera.height - 1))
-                roi_w = max(1, min(self.camera.roi_width, self.camera.width - roi_x))
-                roi_h = max(1, min(self.camera.roi_height, self.camera.height - roi_y))
-                roi_frame = frame[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
-                if roi_frame.size != 0:
-                    frame = cv2.resize(roi_frame, (self.camera.width, self.camera.height), interpolation=cv2.INTER_LINEAR)
+                fw = self.camera.width
+                fh = self.camera.height
+                if getattr(self.camera, "show_roi_content", False):
+                    roi_x = max(0, min(self.camera.roi_x, fw - 1))
+                    roi_y = max(0, min(self.camera.roi_y, fh - 1))
+                    roi_w = max(1, min(self.camera.roi_width, fw - roi_x))
+                    roi_h = max(1, min(self.camera.roi_height, fh - roi_y))
+                    roi_slice = frame[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
+                    if roi_slice.size != 0:
+                        frame = roi_slice
+                    fw = frame.shape[1]
+                    fh = frame.shape[0]
 
                 frame = self.processor.process(
                     frame,
-                    self.camera.width,
-                    self.camera.height,
-                    self.camera.roi_x,
-                    self.camera.roi_y,
-                    self.camera.roi_width,
-                    self.camera.roi_height,
+                    fw,
+                    fh,
+                    0,
+                    0,
+                    fw,
+                    fh,
                     self.camera.method_for_contrast,
                     self.camera.method_for_noise,
                 )
 
-                bytes_per_line = self.camera.channel * self.camera.width
+                bytes_per_line = self.camera.channel * fw
 
-                q_image = QImage(frame.data, self.camera.width, self.camera.height, bytes_per_line, QImage.Format.Format_RGB888)
+                q_image = QImage(frame.data, fw, fh, bytes_per_line, QImage.Format.Format_RGB888)
 
                 pixmap = QPixmap.fromImage(q_image)
 

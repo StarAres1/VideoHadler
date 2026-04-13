@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QTimer, QEvent, QRect, QThread
+from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QTimer, QEvent, QRect, QSize, QThread
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QMainWindow
 from forms.main_window_ui import Ui_MainWindow
@@ -35,8 +35,10 @@ class MainWindow(QMainWindow):
         self.record_elapsed_sec = 0
         self.roi_change_callback = None
         self.roi_controls = None
-        self._rubber_band = QtWidgets.QRubberBand(QtWidgets.QRubberBand.Shape.Rectangle, self.ui.video_frame_label)
+        self.roi_display_applied_callback = None
+        self._roi_content_display_active = False
         self._rb_origin = None
+        self._init_roi_overlay_frames()
         self.nn_loader_thread = None
         self.nn_loader_worker = None
         self.nn_progress_dialog = None
@@ -54,7 +56,7 @@ class MainWindow(QMainWindow):
         self.ui.button_seek_backward.setText("-10 сек")
         self.ui.button_seek_forward.setText("+10 сек")
         self.bt_disable_roi = QtWidgets.QPushButton("Отключить ROI", self.ui.roi_group)
-        self.ui.gridLayout_6.addWidget(self.bt_disable_roi, 4, 0, 1, 4)
+        self.ui.gridLayout_6.addWidget(self.bt_disable_roi, 5, 0, 1, 4)
         self.bt_disable_roi.clicked.connect(self.disable_roi)
         self.ui.video_frame_label.installEventFilter(self)
         self.ui.video_frame_label.setMouseTracking(True)
@@ -80,11 +82,13 @@ class MainWindow(QMainWindow):
         self.ui.label_selected_file_name.setText(os.path.basename(file_path))
         self._set_processing_blocks_enabled(True)
         self.ui.playback_group.setVisible(True)
+        self._reset_roi_display_mode_ui()
 
     def set_camera_stream_active(self, active: bool):
         self._set_processing_blocks_enabled(active)
         self.ui.button_toggle_capture.setText("Стоп" if active else "Старт")
         if active:
+            self._reset_roi_display_mode_ui()
             self.ui.playback_group.setVisible(False)
             self.ui.button_toggle_playback.setText("Старт")
             self.ui.label_playback_time.setText("0:00:00")
@@ -106,11 +110,113 @@ class MainWindow(QMainWindow):
     def set_roi_change_callback(self, callback):
         self.roi_change_callback = callback
 
+    def _init_roi_overlay_frames(self):
+        style = "QFrame { background: transparent; border: 2px solid #00AA00; }"
+        self._roi_box_frame = QtWidgets.QFrame(self.ui.video_frame_label)
+        self._roi_box_frame.setStyleSheet(style)
+        self._roi_box_frame.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._roi_box_frame.hide()
+        self._roi_drag_frame = QtWidgets.QFrame(self.ui.video_frame_label)
+        self._roi_drag_frame.setStyleSheet(style)
+        self._roi_drag_frame.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._roi_drag_frame.hide()
+
+    def _frame_pixel_size(self):
+        if self.camera and getattr(self.camera, "width", None) and getattr(self.camera, "height", None):
+            return int(self.camera.width), int(self.camera.height)
+        if self.videoPlayer and self.videoPlayer.is_loaded() and self.videoPlayer.width and self.videoPlayer.height:
+            return int(self.videoPlayer.width), int(self.videoPlayer.height)
+        return 0, 0
+
+    def _video_pixmap_rect_in_label(self):
+        pix = self.ui.video_frame_label.pixmap()
+        if pix is None or pix.isNull():
+            return None
+        label_w = max(1, self.ui.video_frame_label.width())
+        label_h = max(1, self.ui.video_frame_label.height())
+        pix_w = pix.width()
+        pix_h = pix.height()
+        offset_x = (label_w - pix_w) // 2
+        offset_y = (label_h - pix_h) // 2
+        return QRect(offset_x, offset_y, pix_w, pix_h)
+
+    def _clamp_rect_to_video_area(self, rect: QRect) -> QRect:
+        area = self._video_pixmap_rect_in_label()
+        if area is None:
+            return rect.normalized()
+        return rect.intersected(area).normalized()
+
+    def _update_roi_toggle_button_text(self):
+        if not hasattr(self.ui, "button_toggle_roi_display"):
+            return
+        if self.ui.button_toggle_roi_display.isChecked():
+            self.ui.button_toggle_roi_display.setText("Показать весь кадр")
+        else:
+            self.ui.button_toggle_roi_display.setText("Показать область ROI на видео")
+
+    def set_roi_content_display_active(self, active: bool):
+        self._roi_content_display_active = bool(active)
+        self._roi_drag_frame.hide()
+        self._rb_origin = None
+        self._update_roi_toggle_button_text()
+        self.refresh_roi_overlay()
+
+    def refresh_roi_overlay(self):
+        if not getattr(self, "_roi_box_frame", None):
+            return
+        if self._roi_content_display_active:
+            self._roi_box_frame.hide()
+            return
+        fw, fh = self._frame_pixel_size()
+        if fw < 1 or fh < 1 or not self.roi_controls:
+            self._roi_box_frame.hide()
+            return
+        rx, ry, rw, rh = (
+            self.roi_controls[0].value(),
+            self.roi_controls[1].value(),
+            self.roi_controls[2].value(),
+            self.roi_controls[3].value(),
+        )
+        if rx == 0 and ry == 0 and rw == fw and rh == fh:
+            self._roi_box_frame.hide()
+            return
+        area = self._video_pixmap_rect_in_label()
+        if area is None or area.width() < 1 or area.height() < 1:
+            self._roi_box_frame.hide()
+            return
+        left = area.x() + int((rx / fw) * area.width())
+        top = area.y() + int((ry / fh) * area.height())
+        w_pix = max(1, int((rw / fw) * area.width()))
+        h_pix = max(1, int((rh / fh) * area.height()))
+        geo = QRect(left, top, w_pix, h_pix).intersected(area)
+        if geo.width() < 2 or geo.height() < 2:
+            self._roi_box_frame.hide()
+            return
+        self._roi_box_frame.setGeometry(geo)
+        self._roi_box_frame.show()
+        self._roi_box_frame.raise_()
+
+    def _reset_roi_display_mode_ui(self):
+        if hasattr(self.ui, "button_toggle_roi_display"):
+            self.ui.button_toggle_roi_display.blockSignals(True)
+            self.ui.button_toggle_roi_display.setChecked(False)
+            self.ui.button_toggle_roi_display.blockSignals(False)
+        if self.roi_display_applied_callback:
+            self.roi_display_applied_callback(False)
+        self.set_roi_content_display_active(False)
+
     def disable_roi(self):
         width = self.camera.width if self.camera and self.camera.width else (self.videoPlayer.width if self.videoPlayer else 0)
         height = self.camera.height if self.camera and self.camera.height else (self.videoPlayer.height if self.videoPlayer else 0)
         if not width or not height or not self.roi_controls:
             return
+        if hasattr(self.ui, "button_toggle_roi_display"):
+            self.ui.button_toggle_roi_display.blockSignals(True)
+            self.ui.button_toggle_roi_display.setChecked(False)
+            self.ui.button_toggle_roi_display.blockSignals(False)
+        if self.roi_display_applied_callback:
+            self.roi_display_applied_callback(False)
+        self.set_roi_content_display_active(False)
         roi_x_spin, roi_y_spin, roi_w_spin, roi_h_spin = self.roi_controls
         roi_x_spin.setValue(0)
         roi_y_spin.setValue(0)
@@ -118,6 +224,7 @@ class MainWindow(QMainWindow):
         roi_h_spin.setValue(height)
         if self.roi_change_callback:
             self.roi_change_callback()
+        self.refresh_roi_overlay()
 
     def _apply_roi_from_mouse_rect(self, rect: QRect):
         width = self.camera.width if self.camera and self.camera.width else (self.videoPlayer.width if self.videoPlayer else 0)
@@ -162,23 +269,33 @@ class MainWindow(QMainWindow):
         roi_h_spin.setValue(h)
         if self.roi_change_callback:
             self.roi_change_callback()
+        self.refresh_roi_overlay()
 
     def eventFilter(self, obj, event):
+        if obj is self.ui.video_frame_label:
+            if event.type() == QEvent.Type.Resize:
+                self.refresh_roi_overlay()
         active_camera = self.camera and self.camera.flag_capture
         active_file = self.videoPlayer and self.videoPlayer.is_loaded()
         if obj is self.ui.video_frame_label and (active_camera or active_file):
+            if self._roi_content_display_active:
+                return super().eventFilter(obj, event)
             if event.type() == QEvent.Type.MouseButtonPress and event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self._rb_origin = event.pos()
-                self._rubber_band.setGeometry(QRect(self._rb_origin, QtCore.QSize()))
-                self._rubber_band.show()
+                self._roi_drag_frame.setGeometry(QRect(self._rb_origin, QSize()))
+                self._roi_drag_frame.show()
+                self._roi_drag_frame.raise_()
                 return True
             if event.type() == QEvent.Type.MouseMove and self._rb_origin is not None:
-                self._rubber_band.setGeometry(QRect(self._rb_origin, event.pos()).normalized())
+                r = QRect(self._rb_origin, event.pos()).normalized()
+                r = self._clamp_rect_to_video_area(r)
+                self._roi_drag_frame.setGeometry(r)
                 return True
             if event.type() == QEvent.Type.MouseButtonRelease and event.button() == QtCore.Qt.MouseButton.LeftButton:
                 if self._rb_origin is not None:
                     rect = QRect(self._rb_origin, event.pos()).normalized()
-                    self._rubber_band.hide()
+                    rect = self._clamp_rect_to_video_area(rect)
+                    self._roi_drag_frame.hide()
                     self._apply_roi_from_mouse_rect(rect)
                     self._rb_origin = None
                     return True

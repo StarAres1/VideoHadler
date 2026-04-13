@@ -51,6 +51,7 @@ def _ui_names():
         "button_seek_forward",
         "button_take_screenshot",
         "slider_playback_position",
+        "button_toggle_roi_display",
     ]
 
 
@@ -68,6 +69,8 @@ def make_main_mock(camera=None):
     main.bind_video_player = MagicMock()
     main.set_roi_controls = MagicMock()
     main.set_roi_change_callback = MagicMock()
+    main.refresh_roi_overlay = MagicMock()
+    main.roi_display_applied_callback = None
     main.ask_user_confirmation = MagicMock(return_value=True)
     main.stop_camera_recording = MagicMock()
     main.set_camera_stream_active = MagicMock()

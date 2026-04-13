@@ -26,6 +26,17 @@ class AppController:
         self.main.videoPlayer = VideoPlayer(self.main.ui.video_frame_label)
         self.main.bind_video_player(self.main.videoPlayer)
 
+    def _set_sources_roi_display(self, active: bool):
+        if self.main.camera:
+            self.main.camera.show_roi_content = bool(active)
+        if self.main.videoPlayer and self.main.videoPlayer.is_loaded():
+            self.main.videoPlayer.show_roi_content = bool(active)
+            self.main.videoPlayer.refresh_current_frame()
+
+    def _on_toggle_roi_display(self, checked: bool):
+        self._set_sources_roi_display(checked)
+        self.main.set_roi_content_display_active(checked)
+
     def _apply_to_active_sources(self, method_name, value):
         if self.main.camera and getattr(self.main.camera, "flag_capture", False) and hasattr(self.main.camera, method_name):
             if value is None:
@@ -187,6 +198,7 @@ class AppController:
             self.main.ui.spin_roi_h.setValue(max_h)
 
     def _init_roi_controls(self):
+        self.main.roi_display_applied_callback = self._set_sources_roi_display
         self.main.sl_sp_roi_x = SpinBox_Slider(
             self.main.ui.slider_roi_x, self.main.ui.spin_roi_x, lambda v: self._apply_to_active_sources("set_roi_x", v), 0, 0
         )
@@ -205,6 +217,13 @@ class AppController:
         self.main.ui.spin_roi_y.valueChanged.connect(lambda _: self._update_roi_limits())
         self.main.ui.spin_roi_w.valueChanged.connect(lambda _: self._update_roi_limits())
         self.main.ui.spin_roi_h.valueChanged.connect(lambda _: self._update_roi_limits())
+        for w in (
+            self.main.ui.spin_roi_x,
+            self.main.ui.spin_roi_y,
+            self.main.ui.spin_roi_w,
+            self.main.ui.spin_roi_h,
+        ):
+            w.valueChanged.connect(self.main.refresh_roi_overlay)
         self._init_roi_controls_values()
 
     def _connect_ui(self):
@@ -242,3 +261,4 @@ class AppController:
         self.main.ui.button_seek_forward.clicked.connect(self.main.video_seek_forward)
         self.main.ui.button_take_screenshot.clicked.connect(self.main.make_video_screenshot)
         self.main.ui.slider_playback_position.valueChanged.connect(self.main.set_video_position)
+        self.main.ui.button_toggle_roi_display.toggled.connect(self._on_toggle_roi_display)
