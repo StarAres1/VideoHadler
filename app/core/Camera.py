@@ -91,7 +91,7 @@ class Camera(QObject):
 
     @pyqtSlot(float)
     def show_fps(self, fps):
-        self.ui.statusbar.showMessage(f"FPS: {fps:.2f}")
+        self.ui.status_bar.showMessage(f"FPS: {fps:.2f}")
 
     def get_property(self):
         if not self.cap.isOpened():

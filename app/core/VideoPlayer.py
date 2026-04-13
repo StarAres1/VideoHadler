@@ -20,9 +20,9 @@ class VideoPlayer(QObject):
     show_fps = pyqtSignal(float)
     frame_ready = pyqtSignal(object)
 
-    def __init__(self, label: QLabel):
+    def __init__(self, label_record_format: QLabel):
         super().__init__()
-        self.label = label
+        self.label_record_format = label_record_format
         self.cap = None
         self.timer = None
         self.current_frame = None
@@ -131,8 +131,8 @@ class VideoPlayer(QObject):
         bytes_per_line = ch * w
         qimage = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(qimage)
-        scaled = pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        self.label.setPixmap(scaled)
+        scaled = pixmap.scaled(self.label_record_format.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.label_record_format.setPixmap(scaled)
         self.current_frame = frame_rgb.copy()
 
     def _render_current_frame_async(self):
@@ -289,5 +289,5 @@ class VideoPlayer(QObject):
         self.playback_state_changed.emit(False)
         self.position_changed.emit(0)
         self.time_changed.emit("0:00:00")
-        if self.label:
-            self.label.clear()
+        if self.label_record_format:
+            self.label_record_format.clear()

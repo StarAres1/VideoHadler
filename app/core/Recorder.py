@@ -51,7 +51,6 @@ class Recorder(QObject):
     def record(self, frame):
         if self.output:
             # Конвертируем QImage в numpy массив
-            # QImage Format_RGB888 -> numpy (H, W, 3)
             ptr = frame.bits()
             ptr.setsize(frame.sizeInBytes())
             frame = np.array(ptr).reshape(frame.height(), frame.width(), 3)

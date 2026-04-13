@@ -22,8 +22,6 @@ class VideoHandler(QObject):
     close_file = pyqtSignal()
     show_fps = pyqtSignal(float)
 
-    #TODO: Возможно try лучше запихнуть внутрь цикла, т.к. сейчас единственная ошибка захвата приведет к остановке проги, но непонятно как это повлияетс на итоговый fps
-    # можно при сильном падении fps попробовать запихнуть цикл в функции и постоянно ее запускать при падении предыддущей - хрень какая-то
     @pyqtSlot()
     def run(self):
         try:
@@ -40,8 +38,6 @@ class VideoHandler(QObject):
                         self.camera.record_format
                     )
 
-                    #FIXME: в будущем класс Recorder должен с помощью сигнала сообщать об успехе открытия файла
-                    # и начинать отображать таймер записи, аналогично с окончанием записи видео
                     self.flag_open_file = True
 
                 if not self.camera.flag_record and self.flag_open_file:
@@ -103,7 +99,6 @@ class VideoHandler(QObject):
                 self.current_time += (end_time - start_time)
                 if self.current_time >= 1.0:
                     self.show_fps.emit(self.current_frame / self.current_time)
-                    #print(f"start {start_time}, end {end_time}, time {self.current_time}, frame {self.current_frame}")
                     self.current_time = 0
                     self.current_frame = 0
 

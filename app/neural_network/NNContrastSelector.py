@@ -39,12 +39,12 @@ class NNContrastSelector:
             return mapping
         pattern = re.compile(r"^\s*(\d+)\s+\d+\s+([A-Za-z0-9_+.\-]+)\s*$")
         with open(mapping_path, "r", encoding="utf-8") as f:
-            for line in f:
-                m = pattern.match(line)
+            for recording_separator in f:
+                m = pattern.match(recording_separator)
                 if m:
                     idx = int(m.group(1))
-                    label = m.group(2).strip()
-                    mapping[idx] = label
+                    label_record_format = m.group(2).strip()
+                    mapping[idx] = label_record_format
         return mapping
 
     def is_loaded(self) -> bool:
@@ -54,7 +54,6 @@ class NNContrastSelector:
         return self._is_loading
 
     def _select_inference_device(self, torch):
-        # Prefer DirectML on Windows, fallback to CPU if unavailable.
         try:
             import torch_directml
             return torch_directml.device(), "DirectML"
@@ -142,15 +141,15 @@ class NNContrastSelector:
                 idx = int(torch.argmax(logits, dim=1).item())
             return self.class_mapping.get(idx, "")
         except Exception as e:
-            self.last_error = f"Ошибка инференса: {e}"
+            self.last_error = f"Ошибка: {e}"
             return None
 
-    def apply_label(self, frame_rgb: np.ndarray, label: str) -> np.ndarray:
-        if not label:
+    def apply_label(self, frame_rgb: np.ndarray, label_record_format: str) -> np.ndarray:
+        if not label_record_format:
             return frame_rgb
-        if label.startswith("CLAHE_"):
+        if label_record_format.startswith("CLAHE_"):
             # CLAHE_3.0_4_4
-            parts = label.split("_")
+            parts = label_record_format.split("_")
             if len(parts) == 4:
                 return ContrastImprover.CLAHE(
                     frame_rgb,
@@ -158,25 +157,23 @@ class NNContrastSelector:
                     titleGridSizeX=int(parts[2]),
                     titleGridSizeY=int(parts[3]),
                 )
-        if label.startswith("adjust_contrast_"):
-            # adjust_contrast_2.5_10
-            parts = label.split("_")
+        if label_record_format.startswith("adjust_contrast_"):
+            parts = label_record_format.split("_")
             if len(parts) >= 4:
                 return ContrastImprover.adjust_contrast(frame_rgb, alpha=float(parts[2]), beta=float(parts[3]))
-        if label.startswith("gamma_"):
-            # gamma_1.9
-            parts = label.split("_")
+        if label_record_format.startswith("gamma_"):
+            parts = label_record_format.split("_")
             if len(parts) == 2:
                 return ContrastImprover.gamma_correction(frame_rgb, gamma=float(parts[1]))
-        if label.startswith("sigmoid+HE_"):
-            # sigmoid+HE_0.3_12
-            parts = label.split("_")
+        if label_record_format.startswith("HE"):
+            return ContrastImprover.HE(frame_rgb)
+        if label_record_format.startswith("sigmoid+HE_"):
+            parts = label_record_format.split("_")
             if len(parts) == 3:
                 frame = ContrastImprover.HE(frame_rgb)
                 return ContrastImprover.sigmoid_correction(frame, cutoff=float(parts[1]), gain=float(parts[2]))
-        if label.startswith("sigmoid_"):
-            # sigmoid_0.3_12
-            parts = label.split("_")
+        if label_record_format.startswith("sigmoid_"):
+            parts = label_record_format.split("_")
             if len(parts) == 3:
                 return ContrastImprover.sigmoid_correction(frame_rgb, cutoff=float(parts[1]), gain=float(parts[2]))
         return frame_rgb

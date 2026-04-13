@@ -31,7 +31,6 @@ class FileBrowser(QObject):
         if not movies_path or not os.path.exists(movies_path):
             movies_path = QDir.homePath()
 
-        # Устанавливаем корневой индекс через прокси
         root_index = self.model.index(movies_path)
         self.tree.setRootIndex(self.proxy.mapFromSource(root_index))
 

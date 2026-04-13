@@ -1,0 +1,12 @@
+# Minimal dependencies to run the test suite (faster than full runtime stack).
+# For the full application, use requirements-runtime.txt as well.
+pytest>=7.4.0
+pytest-qt>=4.2.0
+numpy
+opencv-python
+PyQt6
+PyQt6-Qt6
+scikit-image
+Pillow
+pygrabber
+comtypes

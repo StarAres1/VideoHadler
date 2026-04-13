@@ -79,13 +79,12 @@ class FrameProcessor:
                 frame_rgb, alpha=float(self.config.alpha), beta=int(self.config.beta)
             )
         elif contrast_method == ContrastImprovement.HE:
-            frame_rgb = ContrastImprover.HE(frame_rgb, color=bool(self.config.he_color))
+            frame_rgb = ContrastImprover.HE(frame_rgb)
         elif contrast_method == ContrastImprovement.gamma:
             frame_rgb = ContrastImprover.gamma_correction(frame_rgb, gamma=float(self.config.gamma))
         elif contrast_method == ContrastImprovement.autoGamma:
             frame_rgb = ContrastImprover.auto_gamma(
                 frame_rgb,
-                color=bool(self.config.auto_gamma_color),
                 target_brightness=int(self.config.auto_gamma_target_brightness),
             )
         elif contrast_method == ContrastImprovement.sigmoid:
