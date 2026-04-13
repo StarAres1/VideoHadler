@@ -162,6 +162,59 @@ class AppController:
             self.main.ui.spin_roi_h.setValue(cam.height)
         self._update_roi_limits()
 
+    def _on_video_file_opened(self, _path: str):
+        """Новый файл: ROI в плеере уже на весь кадр — синхронизируем спинбоксы (иначе остаются размеры предыдущего ролика)."""
+        self._reset_roi_ui_to_full_frame_for_active_source()
+        self._update_roi_limits()
+
+    def _reset_roi_ui_to_full_frame_for_active_source(self):
+        frame_w, frame_h = self.main.active_native_frame_size()
+        if frame_w < 1 or frame_h < 1:
+            return
+        max_x = max(0, frame_w - 1)
+        max_y = max(0, frame_h - 1)
+        widgets = (
+            self.main.ui.slider_roi_x,
+            self.main.ui.spin_roi_x,
+            self.main.ui.slider_roi_y,
+            self.main.ui.spin_roi_y,
+            self.main.ui.slider_roi_w,
+            self.main.ui.spin_roi_w,
+            self.main.ui.slider_roi_h,
+            self.main.ui.spin_roi_h,
+        )
+        for w in widgets:
+            w.blockSignals(True)
+        try:
+            self.main.ui.slider_roi_x.setMaximum(max_x)
+            self.main.ui.spin_roi_x.setMaximum(max_x)
+            self.main.ui.slider_roi_y.setMaximum(max_y)
+            self.main.ui.spin_roi_y.setMaximum(max_y)
+            self.main.ui.slider_roi_w.setMinimum(1)
+            self.main.ui.spin_roi_w.setMinimum(1)
+            self.main.ui.slider_roi_h.setMinimum(1)
+            self.main.ui.spin_roi_h.setMinimum(1)
+            self.main.ui.slider_roi_w.setMaximum(frame_w)
+            self.main.ui.spin_roi_w.setMaximum(frame_w)
+            self.main.ui.slider_roi_h.setMaximum(frame_h)
+            self.main.ui.spin_roi_h.setMaximum(frame_h)
+            self.main.ui.slider_roi_x.setValue(0)
+            self.main.ui.spin_roi_x.setValue(0)
+            self.main.ui.slider_roi_y.setValue(0)
+            self.main.ui.spin_roi_y.setValue(0)
+            self.main.ui.slider_roi_w.setValue(frame_w)
+            self.main.ui.spin_roi_w.setValue(frame_w)
+            self.main.ui.slider_roi_h.setValue(frame_h)
+            self.main.ui.spin_roi_h.setValue(frame_h)
+        finally:
+            for w in widgets:
+                w.blockSignals(False)
+        self._apply_to_active_sources("set_roi_x", 0)
+        self._apply_to_active_sources("set_roi_y", 0)
+        self._apply_to_active_sources("set_roi_width", frame_w)
+        self._apply_to_active_sources("set_roi_height", frame_h)
+        self.main.refresh_roi_overlay()
+
     def _update_roi_limits(self):
         cam = self.main.camera
         if not cam and not (self.main.videoPlayer and self.main.videoPlayer.is_loaded()):
@@ -265,4 +318,4 @@ class AppController:
         self.main.ui.button_take_screenshot.clicked.connect(self.main.make_video_screenshot)
         self.main.ui.slider_playback_position.valueChanged.connect(self.main.set_video_position)
         self.main.ui.button_toggle_roi_display.toggled.connect(self._on_toggle_roi_display)
-        self.main.videoPlayer.file_opened.connect(lambda _path: self._update_roi_limits())
+        self.main.videoPlayer.file_opened.connect(self._on_video_file_opened)
