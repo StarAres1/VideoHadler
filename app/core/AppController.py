@@ -1,3 +1,5 @@
+import logging
+
 from app.core.CameraManager import CameraManager
 from app.core.Camera import Camera
 from app.core.Enums import ContrastImprovement, NoiseReduction
@@ -6,6 +8,10 @@ from app.core.MainWindow import MainWindow
 from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
 from app.core.VideoPlayer import VideoPlayer
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
+
+logger = logging.getLogger(__name__)
+
+_ROI_METHOD_NAMES = frozenset({"set_roi_x", "set_roi_y", "set_roi_width", "set_roi_height"})
 
 
 class ResolutionProbeWorker(QObject):
@@ -17,10 +23,20 @@ class ResolutionProbeWorker(QObject):
 
     @pyqtSlot()
     def run(self):
+        logger.info(
+            "Фоновый опрос разрешений: старт camera_index=%s",
+            self.camera_index,
+        )
         try:
             resolutions = Camera.probe_supported_resolutions_for_index(self.camera_index)
         except Exception:
+            logger.exception("Фоновый опрос разрешений: ошибка camera_index=%s", self.camera_index)
             resolutions = []
+        logger.info(
+            "Фоновый опрос разрешений: завершён camera_index=%s, найдено режимов=%s",
+            self.camera_index,
+            len(resolutions),
+        )
         self.finished.emit(self.camera_index, resolutions)
 
 
@@ -38,6 +54,7 @@ class AppController:
         self._init_sources()
         self._init_roi_controls()
         self._connect_ui()
+        logger.info("AppController: инициализация завершена")
 
     def _init_sources(self):
         self.camera_manager.find_cameras(self.main.ui.combo_cameras)
@@ -50,6 +67,7 @@ class AppController:
         self.main.tree = FileBrowser(self.main.ui.file_tree_view)
         self.main.videoPlayer = VideoPlayer(self.main.ui.video_frame_label)
         self.main.bind_video_player(self.main.videoPlayer)
+        logger.info("Источники: камеры обнаружены в combo, видеоплеер подключён")
 
     def _set_sources_roi_display(self, active: bool):
         if self.main.camera:
@@ -59,10 +77,19 @@ class AppController:
             self.main.videoPlayer.refresh_current_frame()
 
     def _on_toggle_roi_display(self, checked: bool):
+        logger.info("Оператор: режим отображения ROI на видео=%s", checked)
         self._set_sources_roi_display(checked)
         self.main.set_roi_content_display_active(checked)
 
     def _apply_to_active_sources(self, method_name, value):
+        targets = []
+        if self.main.camera and getattr(self.main.camera, "flag_capture", False):
+            targets.append("camera")
+        if self.main.videoPlayer and self.main.videoPlayer.is_loaded():
+            targets.append("file")
+        tgt = "+".join(targets) if targets else "—"
+        logger.debug("Параметр обработки %s=%r -> источники [%s]", method_name, value, tgt)
+
         if self.main.camera and getattr(self.main.camera, "flag_capture", False) and hasattr(self.main.camera, method_name):
             if value is None:
                 getattr(self.main.camera, method_name)()
@@ -74,7 +101,57 @@ class AppController:
             else:
                 getattr(self.main.videoPlayer, method_name)(value)
 
+    def _operator_contrast(self, method: ContrastImprovement, label: str) -> None:
+        logger.info("Оператор: метод улучшения контраста «%s»", label)
+        self._apply_to_active_sources("set_method_for_contrast", method)
+
+    def _operator_noise(self, method: NoiseReduction, label: str) -> None:
+        logger.info("Оператор: метод шумоподавления «%s»", label)
+        self._apply_to_active_sources("set_method_for_noise", method)
+
+    def _operator_monochrome(self, checked: bool) -> None:
+        logger.info("Оператор: монохромный режим=%s", checked)
+        self._apply_to_active_sources("set_monochrome", checked)
+
+    def _on_record_format_changed(self, fmt: str) -> None:
+        logger.info("Оператор: формат записи видео «%s»", fmt)
+        if self.main.camera:
+            self.main.camera.set_record_format(fmt)
+
+    def _open_dialog_clahe_info(self) -> None:
+        logger.info("Оператор: диалог настроек CLAHE")
+        self.main.show_dialog_CLAHE()
+
+    def _open_dialog_adjust_info(self) -> None:
+        logger.info("Оператор: диалог линейной коррекции контраста")
+        self.main.show_dialog_adjustContrast()
+
+    def _open_dialog_gamma_info(self) -> None:
+        logger.info("Оператор: диалог гамма-коррекции")
+        self.main.show_gamma_info()
+
+    def _open_dialog_sigmoid_info(self) -> None:
+        logger.info("Оператор: диалог сигмоидной коррекции")
+        self.main.show_sigmoid_info()
+
+    def _open_dialog_nn_info(self) -> None:
+        logger.info("Оператор: диалог авто-нейроконтраста")
+        self.main.show_nn_auto_info()
+
+    def _open_dialog_auto_gamma_info(self) -> None:
+        logger.info("Оператор: диалог автогаммы")
+        self.main.show_auto_gamma_info()
+
+    def _open_dialog_median_noise_info(self) -> None:
+        logger.info("Оператор: диалог медианного фильтра")
+        self.main.show_noise_median_info()
+
+    def _open_dialog_fast_gauss_info(self) -> None:
+        logger.info("Оператор: диалог быстрого гаусса")
+        self.main.show_noise_nlm_info()
+
     def _stop_camera_pipeline(self):
+        logger.info("Остановка контура камеры (запись/захват)")
         if self.main.camera and self.main.camera.flag_record:
             self.main.stop_camera_recording()
         if self.main.camera and self.main.camera.flag_capture:
@@ -82,6 +159,7 @@ class AppController:
         self.main.set_camera_stream_active(False)
 
     def _stop_file_playback(self):
+        logger.info("Остановка воспроизведения файла")
         if self.main.videoPlayer and self.main.videoPlayer.is_loaded():
             self.main.videoPlayer.stop()
         self.main.ui.playback_group.setVisible(False)
@@ -92,6 +170,7 @@ class AppController:
     def _on_camera_changed(self, index):
         if index < 0:
             return
+        logger.info("Оператор: смена камеры в списке, индекс=%s", index)
         if self.main.videoPlayer and self.main.videoPlayer.is_loaded():
             approved = self.main.ask_user_confirmation(
                 "Переключение на камеру",
@@ -124,6 +203,7 @@ class AppController:
             self.current_camera_index[0] = index
 
     def _on_resolution_selected(self, width: int, height: int):
+        logger.info("Оператор: выбрано разрешение камеры %sx%s", width, height)
         if self.main.camera:
             self.main.camera.set_selected_resolution(width, height)
             if getattr(self.main.camera, "flag_capture", False):
@@ -131,6 +211,7 @@ class AppController:
                 self._init_roi_controls_values()
 
     def _refresh_resolution_options(self):
+        logger.debug("Обновление списка разрешений для текущей камеры")
         if not self.main.camera:
             self.main.set_camera_resolution_options([], None, self._on_resolution_selected)
             return
@@ -140,6 +221,7 @@ class AppController:
 
         cached = self.camera_manager.get_cached_resolutions(self.main.camera.index)
         if cached:
+            logger.info("Разрешения камеры из кэша (%s шт.)", len(cached))
             self.main.camera.supported_resolutions = list(cached)
             selected = self.main.camera.selected_resolution or cached[0]
             self.main.camera.set_selected_resolution(selected[0], selected[1])
@@ -147,12 +229,17 @@ class AppController:
             return
 
         self.main.set_camera_resolution_loading()
+        logger.info("Запуск фонового опроса разрешений камеры index=%s", self.main.camera.index)
         self._start_resolution_probe(self.main.camera.index)
 
     def _start_resolution_probe(self, camera_index: int):
         if self._resolution_probe_thread is not None:
             try:
                 if self._resolution_probe_thread.isRunning():
+                    logger.info(
+                        "Опрос разрешений занят: запрос камеры index=%s поставлен в очередь",
+                        camera_index,
+                    )
                     self._pending_probe_camera_index = camera_index
                     return
             except RuntimeError:
@@ -175,12 +262,25 @@ class AppController:
         self._resolution_probe_thread.finished.connect(self._on_resolution_probe_thread_finished)
         self._resolution_probe_thread.finished.connect(self._resolution_probe_thread.deleteLater)
         self._resolution_probe_thread.start()
+        logger.debug(
+            "Поток опроса разрешений запущен request_id=%s camera_index=%s",
+            request_id,
+            camera_index,
+        )
 
     def _on_resolution_probe_thread_finished(self):
+        logger.debug("Поток опроса разрешений уничтожен")
         self._resolution_probe_thread = None
         self._resolution_probe_worker = None
 
     def _on_resolution_probe_finished(self, request_id: int, camera_index: int, resolutions):
+        logger.info(
+            "Результат опроса разрешений: request_id=%s camera_index=%s актуальный=%s режимов=%s",
+            request_id,
+            camera_index,
+            request_id == self._active_probe_request_id,
+            len(resolutions or []),
+        )
         if request_id == self._active_probe_request_id:
             self.camera_manager.set_cached_resolutions(camera_index, resolutions)
             if self.main.camera and self.main.camera.index == camera_index:
@@ -195,15 +295,18 @@ class AppController:
         if self._pending_probe_camera_index is not None:
             next_index = self._pending_probe_camera_index
             self._pending_probe_camera_index = None
+            logger.info("Планируется опрос разрешений для камеры index=%s", next_index)
             QTimer.singleShot(120, lambda idx=next_index: self._start_resolution_probe(idx))
 
     def _toggle_capture(self):
         if not self.main.camera:
             return
         if self.main.camera.flag_capture:
+            logger.info("Оператор: остановка захвата с камеры")
             self._stop_camera_pipeline()
             return
 
+        logger.info("Оператор: запуск захвата с камеры")
         if self.main.videoPlayer and self.main.videoPlayer.is_loaded():
             approved = self.main.ask_user_confirmation(
                 "Переход в режим камеры",
@@ -218,6 +321,7 @@ class AppController:
         self.main.set_camera_stream_active(True)
 
     def _on_video_selected(self, path):
+        logger.info("Оператор: выбран видеофайл «%s»", path)
         if self.main.camera and self.main.camera.flag_capture:
             approved = self.main.ask_user_confirmation(
                 "Переход к видеофайлу",
@@ -264,6 +368,7 @@ class AppController:
 
     def _on_video_file_opened(self, _path: str):
         """Новый файл: ROI в плеере уже на весь кадр — синхронизируем спинбоксы (иначе остаются размеры предыдущего ролика)."""
+        logger.info("Видеофайл открыт в плеере, синхронизация ROI с размером кадра")
         self._reset_roi_ui_to_full_frame_for_active_source()
         self._update_roi_limits()
 
@@ -390,30 +495,50 @@ class AppController:
         self.main.ui.combo_cameras.currentIndexChanged.connect(self._on_camera_changed)
         self.main.ui.button_toggle_capture.clicked.connect(self._toggle_capture)
         self.main.ui.button_toggle_recording.clicked.connect(self.main.toggle_camera_recording)
-        self.main.ui.combo_record_format.currentTextChanged.connect(
-            lambda fmt: self.main.camera.set_record_format(fmt) if self.main.camera else None
+        self.main.ui.combo_record_format.currentTextChanged.connect(self._on_record_format_changed)
+        self.main.ui.radio_contrast_clahe.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.CLAHE, "CLAHE")
         )
-        self.main.ui.radio_contrast_clahe.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.CLAHE))
-        self.main.ui.radio_contrast_none.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.NotImprove))
-        self.main.ui.radio_contrast_adjust.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.adjust_contrast))
-        self.main.ui.radio_contrast_he.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.HE))
-        self.main.ui.radio_contrast_gamma.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.gamma))
-        self.main.ui.radio_contrast_sigmoid.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.sigmoid))
-        self.main.ui.radio_contrast_nn.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.nn))
+        self.main.ui.radio_contrast_none.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.NotImprove, "без улучшения")
+        )
+        self.main.ui.radio_contrast_adjust.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.adjust_contrast, "линейная коррекция")
+        )
+        self.main.ui.radio_contrast_he.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.HE, "выравнивание гистограммы")
+        )
+        self.main.ui.radio_contrast_gamma.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.gamma, "гамма")
+        )
+        self.main.ui.radio_contrast_sigmoid.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.sigmoid, "сигмоида")
+        )
+        self.main.ui.radio_contrast_nn.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.nn, "нейросеть (классификация)")
+        )
         self.main.ui.radio_contrast_nn.clicked.connect(self.main.ensure_nn_model_loaded_async)
-        self.main.ui.radio_contrast_auto_gamma.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_contrast", ContrastImprovement.autoGamma))
-        self.main.ui.radio_noise_none.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_noise", NoiseReduction.NotReduction))
-        self.main.ui.radio_noise_median.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_noise", NoiseReduction.MedianBlur))
-        self.main.ui.radio_noise_fast_gaussian.clicked.connect(lambda: self._apply_to_active_sources("set_method_for_noise", NoiseReduction.FastGaussian))
-        self.main.ui.check_monochrome.toggled.connect(lambda v: self._apply_to_active_sources("set_monochrome", v))
-        self.main.ui.button_clahe_info.clicked.connect(self.main.show_dialog_CLAHE)
-        self.main.ui.button_adjust_info.clicked.connect(self.main.show_dialog_adjustContrast)
-        self.main.ui.button_gamma_info.clicked.connect(self.main.show_gamma_info)
-        self.main.ui.button_sigmoid_info.clicked.connect(self.main.show_sigmoid_info)
-        self.main.ui.button_nn_auto_info.clicked.connect(self.main.show_nn_auto_info)
-        self.main.ui.button_auto_gamma_info.clicked.connect(self.main.show_auto_gamma_info)
-        self.main.ui.button_noise_median_info.clicked.connect(self.main.show_noise_median_info)
-        self.main.ui.button_noise_fast_gaussian_info.clicked.connect(self.main.show_noise_nlm_info)
+        self.main.ui.radio_contrast_auto_gamma.clicked.connect(
+            lambda: self._operator_contrast(ContrastImprovement.autoGamma, "автогамма")
+        )
+        self.main.ui.radio_noise_none.clicked.connect(
+            lambda: self._operator_noise(NoiseReduction.NotReduction, "без шумоподавления")
+        )
+        self.main.ui.radio_noise_median.clicked.connect(
+            lambda: self._operator_noise(NoiseReduction.MedianBlur, "медианный фильтр")
+        )
+        self.main.ui.radio_noise_fast_gaussian.clicked.connect(
+            lambda: self._operator_noise(NoiseReduction.FastGaussian, "быстрый гаусс")
+        )
+        self.main.ui.check_monochrome.toggled.connect(self._operator_monochrome)
+        self.main.ui.button_clahe_info.clicked.connect(self._open_dialog_clahe_info)
+        self.main.ui.button_adjust_info.clicked.connect(self._open_dialog_adjust_info)
+        self.main.ui.button_gamma_info.clicked.connect(self._open_dialog_gamma_info)
+        self.main.ui.button_sigmoid_info.clicked.connect(self._open_dialog_sigmoid_info)
+        self.main.ui.button_nn_auto_info.clicked.connect(self._open_dialog_nn_info)
+        self.main.ui.button_auto_gamma_info.clicked.connect(self._open_dialog_auto_gamma_info)
+        self.main.ui.button_noise_median_info.clicked.connect(self._open_dialog_median_noise_info)
+        self.main.ui.button_noise_fast_gaussian_info.clicked.connect(self._open_dialog_fast_gauss_info)
         self.main.tree.video_selected.connect(self._on_video_selected)
         self.main.ui.button_toggle_playback.clicked.connect(self.main.toggle_video_playback)
         self.main.ui.button_seek_backward.clicked.connect(self.main.video_seek_backward)
@@ -424,6 +549,7 @@ class AppController:
         self.main.videoPlayer.file_opened.connect(self._on_video_file_opened)
 
     def _refresh_cameras_and_resolutions(self):
+        logger.info("Оператор: обновление списка камер и разрешений")
         self.camera_manager.find_cameras(self.main.ui.combo_cameras)
         index = self.main.ui.combo_cameras.currentIndex()
         if index >= 0:

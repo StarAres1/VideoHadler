@@ -1,8 +1,12 @@
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread
 from PyQt6.QtGui import QImage, QPixmap
 import cv2
+import logging
 import time
 from app.core.FrameProcessor import FrameProcessor
+
+logger = logging.getLogger(__name__)
+
 
 class VideoHandler(QObject):
     def __init__(self, camera):
@@ -24,6 +28,11 @@ class VideoHandler(QObject):
 
     @pyqtSlot()
     def run(self):
+        logger.info(
+            "VideoHandler.run: вход в цикл захвата камеры «%s» Qt поток=%s",
+            getattr(self.camera, "name", "?"),
+            QThread.currentThread(),
+        )
         try:
             while self.camera.flag_capture:
                 start_time = time.time()
@@ -105,9 +114,13 @@ class VideoHandler(QObject):
                     self.current_time = 0
                     self.current_frame = 0
 
-        except Exception as e:
-            print("При захвате кадра с камеры произошла ошибка: ", e)
+        except Exception:
+            logger.exception("При захвате кадра с камеры произошла ошибка")
         finally:
+            logger.info(
+                "VideoHandler.run: выход из цикла захвата, flag_capture=%s",
+                getattr(self.camera, "flag_capture", None),
+            )
             if self.flag_open_file:
                 self.close_file.emit()
                 self.flag_open_file = False

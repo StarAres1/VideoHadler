@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 
@@ -6,6 +7,9 @@ from datetime import datetime
 from PyQt6.QtGui import QImage
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
 
 class Recorder(QObject):
     def __init__(self):
@@ -39,13 +43,13 @@ class Recorder(QObject):
             extension = "avi"
 
         self.filename = f'video_output/{self.name_camera.replace(" ", "_")}_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.{extension}'
-        print(self.filename)
+        logger.debug("Файл записи: %s", self.filename)
         self.output = cv2.VideoWriter(
             self.filename,
             self.fourcc,
             self.fps,
             (self.width, self.height))
-        print(f"Запись начата в {time.time()}")
+        logger.info("Запись начата (unix time=%s)", time.time())
 
     @pyqtSlot(QImage)
     def record(self, frame):
@@ -64,4 +68,4 @@ class Recorder(QObject):
         if self.output:
             self.output.release()
             self.output = None
-            print(f"Запись завершена в {time.time()}")
+            logger.info("Запись завершена (unix time=%s)", time.time())

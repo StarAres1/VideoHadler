@@ -1,4 +1,10 @@
+import logging
 import sys
+
+from app.logging_setup import setup_application_logging
+
+setup_application_logging()
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QFile, QTextStream
 from app.core.MainWindow import MainWindow
@@ -14,6 +20,7 @@ def load_stylesheet(filename):
 
 
 if __name__ == "__main__":
+    logging.getLogger("app.launcher").info("Запуск приложения")
     app = QApplication(sys.argv)
     app.setStyleSheet(load_stylesheet("styles/style.qss"))
     main_window = MainWindow()

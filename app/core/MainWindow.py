@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 
@@ -11,6 +12,10 @@ from forms.dialog_clahe_ui import Ui_Dialog as ClaheWindow
 from forms.dialog_adjust_contrast_ui import Ui_Dialog as AdjustWindow
 from app.neural_network.NNContrastSelector import NN_SELECTOR
 
+logger = logging.getLogger(__name__)
+
+_ROI_METHOD_NAMES = frozenset({"set_roi_x", "set_roi_y", "set_roi_width", "set_roi_height"})
+
 
 class NNModelLoadWorker(QObject):
     progress = pyqtSignal(int, str)
@@ -18,7 +23,9 @@ class NNModelLoadWorker(QObject):
 
     @pyqtSlot()
     def run(self):
+        logger.info("Фоновая загрузка модели NNContrastSelector: старт")
         ok = NN_SELECTOR.ensure_loaded_with_progress(lambda v, t: self.progress.emit(v, t))
+        logger.info("Фоновая загрузка модели NNContrastSelector: завершено ok=%s", ok)
         self.finished.emit(ok, NN_SELECTOR.last_error)
 
 
@@ -128,12 +135,14 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str)
     def _on_file_opened(self, file_path: str):
+        logger.info("Плеер: файл готов к воспроизведению «%s»", file_path)
         self.ui.label_selected_file_name.setText(os.path.basename(file_path))
         self._set_processing_blocks_enabled(True)
         self.ui.playback_group.setVisible(True)
         self._reset_roi_display_mode_ui()
 
     def set_camera_stream_active(self, active: bool):
+        logger.info("Режим потока камеры: активен=%s", active)
         self._set_processing_blocks_enabled(active)
         self.ui.button_toggle_capture.setText("Стоп" if active else "Старт")
         if active:
@@ -277,6 +286,7 @@ class MainWindow(QMainWindow):
         self.set_roi_content_display_active(False)
 
     def disable_roi(self):
+        logger.info("Оператор: сброс ROI на полный кадр (кнопка)")
         width, height = self.active_native_frame_size()
         if not width or not height or not self.roi_controls:
             return
@@ -339,6 +349,7 @@ class MainWindow(QMainWindow):
         if self.roi_change_callback:
             self.roi_change_callback()
         self.refresh_roi_overlay()
+        logger.info("Оператор: ROI с мыши x=%s y=%s w=%s h=%s (кадр %sx%s)", x, y, w, h, width, height)
 
     def eventFilter(self, obj, event):
         if obj is self.ui.video_frame_label:
@@ -393,11 +404,14 @@ class MainWindow(QMainWindow):
     def start_camera_recording(self):
         if not self.camera:
             self.statusBar().showMessage("Сначала выберите камеру", 2500)
+            logger.info("Запись: камера не выбрана")
             return
         if not self.camera.flag_capture:
             self.statusBar().showMessage("Сначала запустите захват кадров", 2500)
+            logger.info("Запись: захват не запущен")
             return
         selected_format = self.ui.combo_record_format.currentText().strip().lower() or "avi"
+        logger.info("Оператор: начало записи с камеры, формат=%s", selected_format)
         self.camera.set_record_format(selected_format)
         self.camera.start_record(selected_format)
         self.start_record_timer()
@@ -405,6 +419,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def stop_camera_recording(self):
+        logger.info("Оператор: остановка записи с камеры")
         if self.camera:
             self.camera.stop_record()
         self.stop_record_timer()
@@ -412,6 +427,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def toggle_camera_recording(self):
+        logger.info("Оператор: кнопка записи с камеры")
         if not self.camera or not self.camera.flag_capture:
             self.start_camera_recording()
             return
@@ -438,26 +454,32 @@ class MainWindow(QMainWindow):
     def toggle_video_playback(self):
         if not self.videoPlayer or not self.videoPlayer.is_loaded():
             self.statusBar().showMessage("Сначала выберите видеофайл", 2500)
+            logger.info("Оператор: пауза/воспроизведение — нет загруженного файла")
             return
+        logger.info("Оператор: переключение паузы/воспроизведения файла")
         self.videoPlayer.toggle_play_pause()
 
     @pyqtSlot()
     def video_seek_backward(self):
+        logger.info("Оператор: перемотка файла на -10 с")
         if self.videoPlayer:
             self.videoPlayer.seek_seconds(-10)
 
     @pyqtSlot()
     def video_seek_forward(self):
+        logger.info("Оператор: перемотка файла на +10 с")
         if self.videoPlayer:
             self.videoPlayer.seek_seconds(10)
 
     @pyqtSlot(int)
     def set_video_position(self, value: int):
+        logger.debug("Оператор: позиция воспроизведения %s%%", value)
         if self.videoPlayer:
             self.videoPlayer.set_position_percent(value)
 
     @pyqtSlot()
     def make_video_screenshot(self):
+        logger.info("Оператор: сохранение скриншота области предпросмотра")
         pixmap = self.ui.video_frame_label.pixmap()
         if pixmap is None or pixmap.isNull():
             self.statusBar().showMessage("Невозможно сделать скриншот: нет активного кадра", 3000)
@@ -692,7 +714,9 @@ class MainWindow(QMainWindow):
 
     def ensure_nn_model_loaded_async(self):
         if NN_SELECTOR.is_loaded() or NN_SELECTOR.is_loading():
+            logger.debug("Загрузка NN: модель уже загружена или загрузка идёт")
             return
+        logger.info("Запуск фонового потока загрузки модели контраста (NN)")
         self.nn_progress_dialog = QtWidgets.QDialog(self)
         self.nn_progress_dialog.setWindowTitle("Загрузка нейросети")
         self.nn_progress_dialog.setModal(False)
@@ -725,10 +749,12 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(bool, str)
     def _on_nn_load_finished(self, ok: bool, error: str):
+        logger.info("Загрузка модели контраста завершена ok=%s", ok)
         if self.nn_progress_dialog:
             self.nn_progress_dialog.close()
             self.nn_progress_dialog = None
         if not ok:
+            logger.error("Ошибка загрузки нейросети: %s", error)
             self.statusBar().showMessage(f"Ошибка загрузки нейросети: {error}", 5000)
 
     @pyqtSlot()
@@ -766,6 +792,17 @@ class MainWindow(QMainWindow):
         self.dialog_adjust.show()
 
     def _apply_to_active_sources(self, method_name: str, value):
+        targets = []
+        if self.camera and getattr(self.camera, "flag_capture", False):
+            targets.append("camera")
+        if self.videoPlayer and self.videoPlayer.is_loaded():
+            targets.append("file")
+        tgt = "+".join(targets) if targets else "—"
+        if method_name in _ROI_METHOD_NAMES:
+            logger.debug("Диалог: параметр %s=%r -> [%s]", method_name, value, tgt)
+        else:
+            logger.info("Диалог: параметр %s=%r -> [%s]", method_name, value, tgt)
+
         if self.camera and getattr(self.camera, "flag_capture", False) and hasattr(self.camera, method_name):
             if value is None:
                 getattr(self.camera, method_name)()

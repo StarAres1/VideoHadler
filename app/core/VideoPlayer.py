@@ -1,15 +1,18 @@
+import logging
 import os
 import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 import cv2
-from PyQt6.QtCore import QTimer, Qt, QObject, pyqtSlot, pyqtSignal
+from PyQt6.QtCore import QTimer, Qt, QObject, pyqtSlot, pyqtSignal, QThread
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from app.core.Enums import ContrastImprovement, NoiseReduction
 from app.core.FrameProcessor import FrameProcessor
+
+logger = logging.getLogger(__name__)
 
 
 class VideoPlayer(QObject):
@@ -56,7 +59,7 @@ class VideoPlayer(QObject):
         self.stop()
         self.cap = cv2.VideoCapture(file_path)
         if not self.cap.isOpened():
-            print(f"Не удалось открыть видео: {file_path}")
+            logger.error("Не удалось открыть видео: %s", file_path)
             return
 
         self.current_file = file_path
@@ -85,6 +88,14 @@ class VideoPlayer(QObject):
         self._fps_window_start = time.perf_counter()
         self._fps_frame_acc = 0
 
+        logger.info(
+            "Видеофайл открыт «%s» %sx%s fps=%.2f Qt=%s",
+            file_path,
+            self.width,
+            self.height,
+            fps,
+            QThread.currentThread(),
+        )
         self.file_opened.emit(file_path)
 
     def _snapshot_params(self):
@@ -176,6 +187,7 @@ class VideoPlayer(QObject):
             try:
                 out = fut.result()
             except Exception:
+                logger.exception("Ошибка обработки кадра в ThreadPoolExecutor (файл)")
                 out = None
             self.frame_ready.emit(out, count_for_playback_fps)
 
@@ -184,6 +196,7 @@ class VideoPlayer(QObject):
     def update_frame(self):
         ret, frame = self.cap.read()
         if not ret:
+            logger.warning("Конец файла или сбой чтения кадра — пауза")
             self.pause()
             return
         self.raw_frame = frame.copy()
@@ -216,8 +229,10 @@ class VideoPlayer(QObject):
         if not self.cap:
             return
         if self._is_playing:
+            logger.info("Плеер: пауза")
             self.pause()
         else:
+            logger.info("Плеер: возобновление воспроизведения")
             self.resume()
 
     def pause(self):
@@ -237,6 +252,7 @@ class VideoPlayer(QObject):
     def seek_seconds(self, seconds: int):
         if not self.cap:
             return
+            logger.debug("Плеер: seek %+d с", seconds)
         current_ms = self.cap.get(cv2.CAP_PROP_POS_MSEC)
         target_ms = max(0.0, current_ms + seconds * 1000.0)
         if self.duration_ms > 0:
@@ -251,6 +267,7 @@ class VideoPlayer(QObject):
     def set_position_percent(self, percent: int):
         if not self.cap:
             return
+        logger.debug("Плеер: позиция %s%%", percent)
         percent = max(0, min(100, percent))
         target_ms = self.duration_ms * (percent / 100.0)
         self.cap.set(cv2.CAP_PROP_POS_MSEC, target_ms)
@@ -295,6 +312,7 @@ class VideoPlayer(QObject):
         return filepath if ok else None
 
     def stop(self):
+        logger.info("Плеер: остановка и освобождение файла")
         if self.timer:
             self.timer.stop()
             self.timer.deleteLater()

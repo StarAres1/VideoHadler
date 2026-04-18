@@ -1,3 +1,5 @@
+import logging
+
 import cv2
 from app.core.VideoHandler import VideoHandler
 from app.core.Recorder import Recorder
@@ -6,6 +8,9 @@ from PyQt6.QtCore import pyqtSlot, QObject
 from PyQt6.QtGui import QPixmap
 from app.core.Enums import ContrastImprovement, NoiseReduction
 from PyQt6.QtCore import Qt
+
+logger = logging.getLogger(__name__)
+
 
 class Camera(QObject):
     RESOLUTION_CANDIDATES = [
@@ -66,6 +71,7 @@ class Camera(QObject):
         if self.thread_show.isRunning():
             self.stop_capture()
 
+        logger.info("Камера %s (index=%s): подготовка захвата", self.name, self.index)
         # On Windows, DirectShow is usually more stable than MSMF for webcams.
         # Fallback to default backend if DSHOW is unavailable.
         self.cap = cv2.VideoCapture(self.index, cv2.CAP_DSHOW)
@@ -80,6 +86,7 @@ class Camera(QObject):
         if not self.get_property():
             if self.cap:
                 self.cap.release()
+            logger.error("Камера %s: не удалось прочитать первый кадр", self.name)
             return False
 
         self.flag_capture = True
@@ -91,6 +98,11 @@ class Camera(QObject):
         self.thread_show.started.connect(self.video_handler.run)
         self.video_handler.show_fps.connect(self.show_fps)
 
+        logger.info(
+            "Камера %s: запуск потока отображения thread_show=%s",
+            self.name,
+            self.thread_show,
+        )
         self.thread_show.start()
 
     def set_selected_resolution(self, width: int, height: int):
@@ -162,6 +174,7 @@ class Camera(QObject):
             self.selected_resolution = (best_w, best_h)
 
     def stop_capture(self):
+        logger.info("Камера %s: остановка захвата", self.name)
         if self.flag_record:
             self.stop_record()
         self.flag_capture = False
@@ -169,6 +182,7 @@ class Camera(QObject):
         if self.thread_show.isRunning():
             self.thread_show.quit()
             self.thread_show.wait(500)
+        logger.debug("Камера %s: поток отображения остановлен", self.name)
 
     @pyqtSlot(QPixmap)
     def display_frame(self, pixmap):
@@ -202,9 +216,7 @@ class Camera(QObject):
         self.roi_width = self.width
         self.roi_height = self.height
         self.show_roi_content = False
-        print(self.name)
-        print(self.width)
-        print(self.height)
+        logger.debug("Свойства кадра камеры %s: %sx%s", self.name, self.width, self.height)
         return True
 
     def _normalize_roi(self):
@@ -221,6 +233,7 @@ class Camera(QObject):
         if not self.video_handler or not self.flag_capture:
             return
 
+        logger.info("Камера %s: запись в файл, поток записи thread_write=%s", self.name, self.thread_write)
         self.flag_record = True
         self.record_format = (video_format or "avi").lower()
 
