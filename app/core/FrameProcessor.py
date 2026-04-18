@@ -94,11 +94,13 @@ class FrameProcessor:
                 gain=float(self.config.sigmoid_gain),
             )
         elif contrast_method == ContrastImprovement.nn:
+            # После успешного predict пропускаем nn_skip_frames кадров (без вызова сети), применяя последний ярлык.
+            # Счётчик не трогаем, если инференс не дал ярлык — иначе зря «замораживали» бы кадры со старым ярлыком.
             if self._nn_skip_counter <= 0 or not self._nn_last_label:
                 predicted = self.nn_selector.predict_label(frame_rgb)
                 if predicted:
                     self._nn_last_label = predicted
-                self._nn_skip_counter = max(0, int(self.config.nn_skip_frames))
+                    self._nn_skip_counter = max(0, int(self.config.nn_skip_frames))
             else:
                 self._nn_skip_counter -= 1
             if self._nn_last_label:

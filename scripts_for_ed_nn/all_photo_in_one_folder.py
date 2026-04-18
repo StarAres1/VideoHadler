@@ -3,8 +3,8 @@ import shutil
 from pathlib import Path
 
 # ===== Настройки =====
-SOURCE_DIR = r"organized_images"   # укажите ваш путь
-TARGET_DIR = r"../../dataset/half"   # укажите ваш путь
+SOURCE_DIR = r"C:\Projects\QtTrial\dataset\sorted"   # укажите ваш путь
+TARGET_DIR = r"C:\Projects\QtTrial\dataset\half"   # укажите ваш путь
 # ====================
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.svg'}

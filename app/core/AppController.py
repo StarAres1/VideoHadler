@@ -1,9 +1,27 @@
 from app.core.CameraManager import CameraManager
+from app.core.Camera import Camera
 from app.core.Enums import ContrastImprovement, NoiseReduction
 from app.core.custom_widgets.FileBrowser import FileBrowser
 from app.core.MainWindow import MainWindow
 from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
 from app.core.VideoPlayer import VideoPlayer
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
+
+
+class ResolutionProbeWorker(QObject):
+    finished = pyqtSignal(int, object)
+
+    def __init__(self, camera_index: int):
+        super().__init__()
+        self.camera_index = camera_index
+
+    @pyqtSlot()
+    def run(self):
+        try:
+            resolutions = Camera.probe_supported_resolutions_for_index(self.camera_index)
+        except Exception:
+            resolutions = []
+        self.finished.emit(self.camera_index, resolutions)
 
 
 class AppController:
@@ -11,6 +29,11 @@ class AppController:
         self.main = main_window
         self.camera_manager = CameraManager(self.main.ui.video_frame_label, self.main.ui)
         self.current_camera_index = [self.main.ui.combo_cameras.currentIndex()]
+        self._resolution_probe_thread = None
+        self._resolution_probe_worker = None
+        self._resolution_probe_request_id = 0
+        self._active_probe_request_id = 0
+        self._pending_probe_camera_index = None
 
         self._init_sources()
         self._init_roi_controls()
@@ -21,6 +44,8 @@ class AppController:
         self.main.camera = self.camera_manager.current_camera(0)
         if self.main.camera is None:
             self.main.statusBar().showMessage("Камеры не найдены. Доступен только режим воспроизведения файла.", 5000)
+        else:
+            self._refresh_resolution_options()
 
         self.main.tree = FileBrowser(self.main.ui.file_tree_view)
         self.main.videoPlayer = VideoPlayer(self.main.ui.video_frame_label)
@@ -94,8 +119,83 @@ class AppController:
         selected = self.camera_manager.current_camera(index)
         if selected:
             self.main.camera = selected
+            self._refresh_resolution_options()
             self._init_roi_controls_values()
             self.current_camera_index[0] = index
+
+    def _on_resolution_selected(self, width: int, height: int):
+        if self.main.camera:
+            self.main.camera.set_selected_resolution(width, height)
+            if getattr(self.main.camera, "flag_capture", False):
+                self.main.camera.apply_selected_resolution_runtime()
+                self._init_roi_controls_values()
+
+    def _refresh_resolution_options(self):
+        if not self.main.camera:
+            self.main.set_camera_resolution_options([], None, self._on_resolution_selected)
+            return
+        if not isinstance(self.main.camera, Camera):
+            self.main.set_camera_resolution_options([], None, self._on_resolution_selected)
+            return
+
+        cached = self.camera_manager.get_cached_resolutions(self.main.camera.index)
+        if cached:
+            self.main.camera.supported_resolutions = list(cached)
+            selected = self.main.camera.selected_resolution or cached[0]
+            self.main.camera.set_selected_resolution(selected[0], selected[1])
+            self.main.set_camera_resolution_options(cached, selected, self._on_resolution_selected)
+            return
+
+        self.main.set_camera_resolution_loading()
+        self._start_resolution_probe(self.main.camera.index)
+
+    def _start_resolution_probe(self, camera_index: int):
+        if self._resolution_probe_thread is not None:
+            try:
+                if self._resolution_probe_thread.isRunning():
+                    self._pending_probe_camera_index = camera_index
+                    return
+            except RuntimeError:
+                # Underlying C++ QThread can be already deleted.
+                self._resolution_probe_thread = None
+                self._resolution_probe_worker = None
+        self._resolution_probe_request_id += 1
+        request_id = self._resolution_probe_request_id
+        self._active_probe_request_id = request_id
+        self._pending_probe_camera_index = None
+        self._resolution_probe_thread = QThread()
+        self._resolution_probe_worker = ResolutionProbeWorker(camera_index)
+        self._resolution_probe_worker.moveToThread(self._resolution_probe_thread)
+        self._resolution_probe_thread.started.connect(self._resolution_probe_worker.run)
+        self._resolution_probe_worker.finished.connect(
+            lambda camera_idx, resolutions, rid=request_id: self._on_resolution_probe_finished(rid, camera_idx, resolutions)
+        )
+        self._resolution_probe_worker.finished.connect(self._resolution_probe_thread.quit)
+        self._resolution_probe_worker.finished.connect(self._resolution_probe_worker.deleteLater)
+        self._resolution_probe_thread.finished.connect(self._on_resolution_probe_thread_finished)
+        self._resolution_probe_thread.finished.connect(self._resolution_probe_thread.deleteLater)
+        self._resolution_probe_thread.start()
+
+    def _on_resolution_probe_thread_finished(self):
+        self._resolution_probe_thread = None
+        self._resolution_probe_worker = None
+
+    def _on_resolution_probe_finished(self, request_id: int, camera_index: int, resolutions):
+        if request_id == self._active_probe_request_id:
+            self.camera_manager.set_cached_resolutions(camera_index, resolutions)
+            if self.main.camera and self.main.camera.index == camera_index:
+                self.main.camera.supported_resolutions = list(resolutions)
+                if not resolutions:
+                    self.main.set_camera_resolution_options([], None, self._on_resolution_selected)
+                else:
+                    selected = self.main.camera.selected_resolution or resolutions[0]
+                    self.main.camera.set_selected_resolution(selected[0], selected[1])
+                    self.main.set_camera_resolution_options(resolutions, selected, self._on_resolution_selected)
+
+        if self._pending_probe_camera_index is not None:
+            next_index = self._pending_probe_camera_index
+            self._pending_probe_camera_index = None
+            QTimer.singleShot(120, lambda idx=next_index: self._start_resolution_probe(idx))
 
     def _toggle_capture(self):
         if not self.main.camera:
@@ -226,8 +326,17 @@ class AppController:
             frame_h = 480
         x = self.main.ui.spin_roi_x.value()
         y = self.main.ui.spin_roi_y.value()
-        max_x = max(0, frame_w - 1)
-        max_y = max(0, frame_h - 1)
+        roi_w = self.main.ui.spin_roi_w.value()
+        roi_h = self.main.ui.spin_roi_h.value()
+        roi_w = max(1, min(roi_w, frame_w))
+        roi_h = max(1, min(roi_h, frame_h))
+        if self.main.ui.spin_roi_w.value() != roi_w:
+            self.main.ui.spin_roi_w.setValue(roi_w)
+        if self.main.ui.spin_roi_h.value() != roi_h:
+            self.main.ui.spin_roi_h.setValue(roi_h)
+
+        max_x = max(0, frame_w - roi_w)
+        max_y = max(0, frame_h - roi_h)
         self.main.ui.slider_roi_x.setMaximum(max_x)
         self.main.ui.spin_roi_x.setMaximum(max_x)
         self.main.ui.slider_roi_y.setMaximum(max_y)
@@ -238,20 +347,14 @@ class AppController:
         if y > max_y:
             self.main.ui.spin_roi_y.setValue(max_y)
             y = max_y
-        max_w = max(1, frame_w - x)
-        max_h = max(1, frame_h - y)
         self.main.ui.slider_roi_w.setMinimum(1)
         self.main.ui.spin_roi_w.setMinimum(1)
         self.main.ui.slider_roi_h.setMinimum(1)
         self.main.ui.spin_roi_h.setMinimum(1)
-        self.main.ui.slider_roi_w.setMaximum(max_w)
-        self.main.ui.spin_roi_w.setMaximum(max_w)
-        self.main.ui.slider_roi_h.setMaximum(max_h)
-        self.main.ui.spin_roi_h.setMaximum(max_h)
-        if self.main.ui.spin_roi_w.value() > max_w:
-            self.main.ui.spin_roi_w.setValue(max_w)
-        if self.main.ui.spin_roi_h.value() > max_h:
-            self.main.ui.spin_roi_h.setValue(max_h)
+        self.main.ui.slider_roi_w.setMaximum(frame_w)
+        self.main.ui.spin_roi_w.setMaximum(frame_w)
+        self.main.ui.slider_roi_h.setMaximum(frame_h)
+        self.main.ui.spin_roi_h.setMaximum(frame_h)
 
     def _init_roi_controls(self):
         self.main.roi_display_applied_callback = self._set_sources_roi_display
@@ -283,7 +386,7 @@ class AppController:
         self._init_roi_controls_values()
 
     def _connect_ui(self):
-        self.main.ui.button_refresh_cameras.clicked.connect(lambda: self.camera_manager.find_cameras(self.main.ui.combo_cameras))
+        self.main.ui.button_refresh_cameras.clicked.connect(self._refresh_cameras_and_resolutions)
         self.main.ui.combo_cameras.currentIndexChanged.connect(self._on_camera_changed)
         self.main.ui.button_toggle_capture.clicked.connect(self._toggle_capture)
         self.main.ui.button_toggle_recording.clicked.connect(self.main.toggle_camera_recording)
@@ -319,3 +422,13 @@ class AppController:
         self.main.ui.slider_playback_position.valueChanged.connect(self.main.set_video_position)
         self.main.ui.button_toggle_roi_display.toggled.connect(self._on_toggle_roi_display)
         self.main.videoPlayer.file_opened.connect(self._on_video_file_opened)
+
+    def _refresh_cameras_and_resolutions(self):
+        self.camera_manager.find_cameras(self.main.ui.combo_cameras)
+        index = self.main.ui.combo_cameras.currentIndex()
+        if index >= 0:
+            selected = self.camera_manager.current_camera(index)
+            if selected:
+                self.main.camera = selected
+                self.current_camera_index[0] = index
+                self._refresh_resolution_options()

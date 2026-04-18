@@ -8,6 +8,16 @@ from app.core.Enums import ContrastImprovement, NoiseReduction
 from PyQt6.QtCore import Qt
 
 class Camera(QObject):
+    RESOLUTION_CANDIDATES = [
+        (1920, 1080),
+        (1600, 1200),
+        (1280, 1024),
+        (1280, 720),
+        (1024, 768),
+        (800, 600),
+        (640, 480),
+    ]
+
     def __init__(self, index, name, video_frame, ui):
         super().__init__()
         self.cap = None
@@ -39,6 +49,8 @@ class Camera(QObject):
         self.roi_width = 1
         self.roi_height = 1
         self.show_roi_content = False
+        self.supported_resolutions = []
+        self.selected_resolution = None
 
     def set_method_for_contrast(self, method):
         self.method_for_contrast = method
@@ -54,7 +66,16 @@ class Camera(QObject):
         if self.thread_show.isRunning():
             self.stop_capture()
 
-        self.cap = cv2.VideoCapture(self.index)
+        # On Windows, DirectShow is usually more stable than MSMF for webcams.
+        # Fallback to default backend if DSHOW is unavailable.
+        self.cap = cv2.VideoCapture(self.index, cv2.CAP_DSHOW)
+        if not self.cap or not self.cap.isOpened():
+            self.cap = cv2.VideoCapture(self.index)
+
+        if self.selected_resolution is not None:
+            self._apply_resolution(self.cap, self.selected_resolution[0], self.selected_resolution[1])
+        else:
+            self._set_max_supported_resolution()
 
         if not self.get_property():
             if self.cap:
@@ -71,6 +92,74 @@ class Camera(QObject):
         self.video_handler.show_fps.connect(self.show_fps)
 
         self.thread_show.start()
+
+    def set_selected_resolution(self, width: int, height: int):
+        self.selected_resolution = (int(width), int(height))
+
+    def apply_selected_resolution_runtime(self):
+        """Apply selected resolution while capture is active."""
+        if not self.cap or not self.selected_resolution:
+            return False
+        width, height = self.selected_resolution
+        if not self._apply_resolution(self.cap, width, height):
+            return False
+        got_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        got_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        if got_w > 0 and got_h > 0:
+            self.width = got_w
+            self.height = got_h
+            self.prop = self.width / self.height if self.height else None
+            self._normalize_roi()
+            return True
+        return False
+
+    def probe_supported_resolutions(self):
+        """Probe camera modes and return unique supported resolutions sorted by area desc."""
+        resolutions = self.probe_supported_resolutions_for_index(self.index)
+        self.supported_resolutions = resolutions
+        return resolutions
+
+    @classmethod
+    def probe_supported_resolutions_for_index(cls, camera_index: int):
+        # Prefer DirectShow for probing on Windows to match runtime capture behavior.
+        cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+        if not cap or not cap.isOpened():
+            cap = cv2.VideoCapture(camera_index)
+        if not cap or not cap.isOpened():
+            return []
+
+        found = {}
+        try:
+            for cand_w, cand_h in cls.RESOLUTION_CANDIDATES:
+                if not cls._apply_resolution(cap, cand_w, cand_h):
+                    continue
+                got_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+                got_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+                if got_w > 0 and got_h > 0:
+                    found[(got_w, got_h)] = got_w * got_h
+        finally:
+            cap.release()
+
+        resolutions = sorted(found.keys(), key=lambda wh: (wh[0] * wh[1], wh[0], wh[1]), reverse=True)
+        return resolutions
+
+    @staticmethod
+    def _apply_resolution(cap, width: int, height: int):
+        try:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(width))
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
+            return True
+        except Exception:
+            return False
+
+    def _set_max_supported_resolution(self):
+        if not self.cap:
+            return
+        resolutions = self.supported_resolutions or self.probe_supported_resolutions()
+        if resolutions:
+            best_w, best_h = resolutions[0]
+            self._apply_resolution(self.cap, best_w, best_h)
+            self.selected_resolution = (best_w, best_h)
 
     def stop_capture(self):
         if self.flag_record:
@@ -113,15 +202,20 @@ class Camera(QObject):
         self.roi_width = self.width
         self.roi_height = self.height
         self.show_roi_content = False
+        print(self.name)
+        print(self.width)
+        print(self.height)
         return True
 
     def _normalize_roi(self):
         if not self.width or not self.height:
             return
-        self.roi_x = max(0, min(int(self.roi_x), self.width - 1))
-        self.roi_y = max(0, min(int(self.roi_y), self.height - 1))
-        self.roi_width = max(1, min(int(self.roi_width), self.width - self.roi_x))
-        self.roi_height = max(1, min(int(self.roi_height), self.height - self.roi_y))
+        self.roi_width = max(1, min(int(self.roi_width), self.width))
+        self.roi_height = max(1, min(int(self.roi_height), self.height))
+        max_x = max(0, self.width - self.roi_width)
+        max_y = max(0, self.height - self.roi_height)
+        self.roi_x = max(0, min(int(self.roi_x), max_x))
+        self.roi_y = max(0, min(int(self.roi_y), max_y))
 
     def start_record(self, video_format="avi"):
         if not self.video_handler or not self.flag_capture:
@@ -143,8 +237,6 @@ class Camera(QObject):
     def stop_record(self):
         self.flag_record = False
 
-        #FIXME: должно вызываться сингалом, задержка - костыль, чтобы слот
-        # close в Recorder успел выполниться
         self.thread_write.wait(1000)
         self.thread_write.quit()
         self.thread_write.wait(500)

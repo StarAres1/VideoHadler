@@ -7,6 +7,7 @@ class CameraManager:
         self.cameras = []
         self.video_frame = video_frame
         self.ui = ui
+        self._resolution_cache = {}
 
     def find_cameras(self, gui_list):
         gui_list.clear()
@@ -27,4 +28,13 @@ class CameraManager:
         return self.cameras[0]
 
     def create_camera(self, index, name):
-        return Camera(index, name, self.video_frame, self.ui)
+        camera = Camera(index, name, self.video_frame, self.ui)
+        if index in self._resolution_cache:
+            camera.supported_resolutions = list(self._resolution_cache[index])
+        return camera
+
+    def get_cached_resolutions(self, index: int):
+        return list(self._resolution_cache.get(index, []))
+
+    def set_cached_resolutions(self, index: int, resolutions):
+        self._resolution_cache[index] = list(resolutions or [])

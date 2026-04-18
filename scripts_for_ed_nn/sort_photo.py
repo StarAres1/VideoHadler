@@ -4,16 +4,16 @@ import shutil
 
 # ================= НАСТРОЙКИ =================
 # Путь к файлу с метаданными
-JSONL_PATH = 'results_markup/best_methods(huge_ssim_6)1.jsonl'
+JSONL_PATH = '/scripts_for_ed_nn/results_markup/best_methods_baseline_filter(huge_ssim_6)1.jsonl'
 
 # Папка, где сейчас лежат исходные фотографии
-SOURCE_IMAGES_DIR = '../../dataset/half'
+SOURCE_IMAGES_DIR = 'C:/Projects/QtTrial/dataset/half'
 
 # Папка, куда будут перемещены фотографии (создастся автоматически)
-DEST_ROOT_DIR = 'organized_images'
+DEST_ROOT_DIR = 'C:/Projects/QtTrial/sorted'
 
 # Имя выходного файла с картой папок
-OUTPUT_JSON_PATH = 'results_markup/folder_mapping_huge_ssim_6.json'
+OUTPUT_JSON_PATH = 'results_markup/final.json'
 
 
 # =============================================

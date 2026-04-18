@@ -1,7 +1,8 @@
 import os
 import re
-from typing import Callable
 import threading
+from pathlib import Path
+from typing import Callable
 
 import cv2
 import numpy as np
@@ -83,20 +84,21 @@ class NNContrastSelector:
 
         if progress_cb:
             progress_cb(20, "Подготовка файлов модели...")
-        model_path = os.path.join("app", "neural_network", "models", "ssim_rms_6", "saved_models", "best_model.pth")
-        mapping_path = os.path.join("app", "neural_network", "models", "ssim_rms_6", "logs", "class_mapping.txt")
-        if not os.path.exists(model_path):
+        nn_dir = Path(__file__).resolve().parent
+        model_path = nn_dir / "models" / "final" / "saved_models" / "best_model.pth"
+        mapping_path = nn_dir / "models" / "final" / "logs" / "class_mapping.txt"
+        if not model_path.is_file():
             self.last_error = f"Файл модели не найден: {model_path}"
             self._is_loading = False
             return False
 
-        self.class_mapping = self._parse_mapping_file(mapping_path)
+        self.class_mapping = self._parse_mapping_file(str(mapping_path))
         num_classes = max(self.class_mapping.keys(), default=5) + 1
 
         try:
             if progress_cb:
                 progress_cb(35, "Чтение весов из файла...")
-            checkpoint = torch.load(model_path, map_location="cpu")
+            checkpoint = torch.load(str(model_path), map_location="cpu")
             state_dict = checkpoint.get("model_state_dict", checkpoint)
 
             if progress_cb:

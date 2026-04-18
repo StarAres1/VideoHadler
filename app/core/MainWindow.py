@@ -42,6 +42,8 @@ class MainWindow(QMainWindow):
         self.nn_loader_thread = None
         self.nn_loader_worker = None
         self.nn_progress_dialog = None
+        self.resolution_radio_buttons = []
+        self.resolution_selected_callback = None
         self._setup_static_ui()
 
     def _setup_static_ui(self):
@@ -64,6 +66,53 @@ class MainWindow(QMainWindow):
         self.ui.playback_group.setVisible(False)
         self.ui.playback_group.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         self.ui.playback_group.setFixedHeight(self.ui.playback_group.sizeHint().height())
+        self._init_resolution_controls()
+
+    def _init_resolution_controls(self):
+        self.resolution_group = QtWidgets.QGroupBox("Разрешение камеры", self.ui.group_camera_capture)
+        self.resolution_layout = QtWidgets.QVBoxLayout(self.resolution_group)
+        self.resolution_layout.setContentsMargins(8, 6, 8, 6)
+        self.resolution_layout.setSpacing(4)
+        self.resolution_hint = QtWidgets.QLabel("Выберите разрешение перед запуском захвата")
+        self.resolution_layout.addWidget(self.resolution_hint)
+        self.ui.gridLayout_2.addWidget(self.resolution_group, 3, 0, 1, 2)
+
+    def set_camera_resolution_options(self, resolutions, selected, on_selected):
+        self.resolution_selected_callback = on_selected
+        for rb in self.resolution_radio_buttons:
+            self.resolution_layout.removeWidget(rb)
+            rb.deleteLater()
+        self.resolution_radio_buttons = []
+
+        if not resolutions:
+            self.resolution_hint.setText("Не удалось определить поддерживаемые разрешения")
+            return
+
+        self.resolution_hint.setText("Доступные разрешения:")
+        selected_tuple = tuple(selected) if selected else tuple(resolutions[0])
+        for width, height in resolutions:
+            rb = QtWidgets.QRadioButton(f"{width} x {height}")
+            rb.setChecked((width, height) == selected_tuple)
+            rb.toggled.connect(
+                lambda checked, w=width, h=height: self._on_resolution_radio_toggled(
+                    checked, w, h
+                )
+            )
+            self.resolution_layout.addWidget(rb)
+            self.resolution_radio_buttons.append(rb)
+
+    def set_camera_resolution_loading(self):
+        for rb in self.resolution_radio_buttons:
+            self.resolution_layout.removeWidget(rb)
+            rb.deleteLater()
+        self.resolution_radio_buttons = []
+        self.resolution_hint.setText("Поиск поддерживаемых разрешений...")
+
+    def _on_resolution_radio_toggled(self, checked: bool, width: int, height: int):
+        if not checked:
+            return
+        if self.resolution_selected_callback:
+            self.resolution_selected_callback(width, height)
 
     def bind_video_player(self, video_player):
         self.videoPlayer = video_player
@@ -283,10 +332,10 @@ class MainWindow(QMainWindow):
         h = max(1, min(h, height - y))
 
         roi_x_spin, roi_y_spin, roi_w_spin, roi_h_spin = self.roi_controls
-        roi_x_spin.setValue(x)
-        roi_y_spin.setValue(y)
         roi_w_spin.setValue(w)
         roi_h_spin.setValue(h)
+        roi_x_spin.setValue(x)
+        roi_y_spin.setValue(y)
         if self.roi_change_callback:
             self.roi_change_callback()
         self.refresh_roi_overlay()

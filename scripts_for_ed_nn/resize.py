@@ -2,7 +2,7 @@ import os
 from PIL import Image
 from tqdm import tqdm
 
-def resize_images_to_half(input_dir='.', output_dir='half_ref'):
+def resize_images_to_half(input_dir='.', output_dir='C:\Projects\QtTrial\dataset\datase\half_ref'):
     """
     Уменьшает все PNG изображения в указанной папке в 2 раза по ширине и высоте.
     Результаты сохраняются в отдельную папку (по умолчанию 'half').
@@ -36,4 +36,4 @@ def resize_images_to_half(input_dir='.', output_dir='half_ref'):
             tqdm.write(f"Ошибка при обработке {filename}: {e}")
 
 if __name__ == "__main__":
-    resize_images_to_half("../../other/dataset")
+    resize_images_to_half("C:\Projects\QtTrial\dataset\dataset")
