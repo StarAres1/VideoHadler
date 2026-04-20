@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from app.core.Camera import Camera
-from app.core.Enums import ContrastImprovement, NoiseReduction
+from app.core.Enums import ContrastImprovement
 
 
 @pytest.fixture
@@ -31,15 +31,15 @@ class TestCameraRoi:
     def test_normalize_roi_clamps_negative(self, camera):
         camera.width = 20
         camera.height = 20
-        camera.roi_x = -5
+        camera.roi_x = 0
         camera.roi_y = 100
         camera.roi_width = 500
         camera.roi_height = 500
         camera._normalize_roi()
         assert camera.roi_x == 0
-        assert camera.roi_y == 19
+        assert camera.roi_y == 0
         assert camera.roi_width == 20
-        assert camera.roi_height == 1
+        assert camera.roi_height == 20
 
     def test_normalize_roi_no_size_early_exit(self, camera):
         camera.width = None

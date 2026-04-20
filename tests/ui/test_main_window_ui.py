@@ -171,6 +171,9 @@ class TestRoiSelectionUpdatesSpinBoxes:
         assert main_win.ui.spin_roi_w.value() >= 1
         assert main_win.ui.spin_roi_h.value() >= 1
         assert main_win.ui.spin_roi_x.value() >= 0
+        # Regression: first ROI placement must not snap to zero offsets.
+        assert main_win.ui.spin_roi_x.value() > 0
+        assert main_win.ui.spin_roi_y.value() > 0
 
 
 class TestClaheDialogOpens:

@@ -83,6 +83,7 @@ class VideoHandler(QObject):
                     fw = frame.shape[1]
                     fh = frame.shape[0]
 
+                self.camera.last_preview_before_rgb = frame.copy()
                 frame = self.processor.process(
                     frame,
                     fw,
@@ -94,6 +95,7 @@ class VideoHandler(QObject):
                     self.camera.method_for_contrast,
                     self.camera.method_for_noise,
                 )
+                self.camera.last_preview_after_rgb = frame.copy()
 
                 bytes_per_line = self.camera.channel * fw
 

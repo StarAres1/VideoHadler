@@ -302,6 +302,24 @@ class VideoPlayer(QObject):
     def set_roi_width(self, value): self.roi_width = int(value); self.refresh_current_frame()
     def set_roi_height(self, value): self.roi_height = int(value); self.refresh_current_frame()
 
+    def get_frame_pair_for_statistics(self):
+        """Return pair (before_rgb, after_rgb) for current displayed frame."""
+        if self.raw_frame is None or self.current_frame is None:
+            return None, None
+        before_rgb = cv2.cvtColor(self.raw_frame.copy(), cv2.COLOR_BGR2RGB)
+        if self.show_roi_content:
+            fw = max(1, int(self.width or before_rgb.shape[1]))
+            fh = max(1, int(self.height or before_rgb.shape[0]))
+            roi_x = max(0, min(int(self.roi_x), max(0, fw - 1)))
+            roi_y = max(0, min(int(self.roi_y), max(0, fh - 1)))
+            roi_w = max(1, min(int(self.roi_width), max(1, fw - roi_x)))
+            roi_h = max(1, min(int(self.roi_height), max(1, fh - roi_y)))
+            before_rgb = before_rgb[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
+        after_rgb = self.current_frame.copy()
+        if before_rgb.shape[:2] != after_rgb.shape[:2]:
+            before_rgb = cv2.resize(before_rgb, (after_rgb.shape[1], after_rgb.shape[0]), interpolation=cv2.INTER_AREA)
+        return before_rgb, after_rgb
+
     def save_screenshot(self, output_dir: str = "screenshots") -> str | None:
         if self.current_frame is None:
             return None

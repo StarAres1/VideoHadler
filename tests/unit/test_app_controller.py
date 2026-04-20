@@ -76,6 +76,8 @@ def make_main_mock(camera=None):
     main.set_camera_stream_active = MagicMock()
     main.toggle_camera_recording = MagicMock()
     main.ensure_nn_model_loaded_async = MagicMock()
+    main.set_camera_resolution_options = MagicMock()
+    main.set_camera_resolution_loading = MagicMock()
     main.show_dialog_CLAHE = MagicMock()
     main.show_dialog_adjustContrast = MagicMock()
     main.show_gamma_info = MagicMock()
@@ -203,3 +205,61 @@ def test_update_roi_limits_with_video_player_only(patched_deps):
     main.ui.spin_roi_h.value.return_value = 100
     ac._update_roi_limits()
     main.ui.slider_roi_w.setMaximum.assert_called()
+
+
+def test_update_roi_limits_prioritizes_roi_size_and_clamps_offsets(patched_deps):
+    main = make_main_mock(camera=None)
+    ac = AppController(main)
+    vp = MagicMock()
+    vp.is_loaded.return_value = True
+    main.videoPlayer = vp
+    main.active_native_frame_size = MagicMock(return_value=(320, 240))
+    main.ui.spin_roi_w.value.return_value = 300
+    main.ui.spin_roi_h.value.return_value = 220
+    main.ui.spin_roi_x.value.return_value = 50
+    main.ui.spin_roi_y.value.return_value = 30
+
+    ac._update_roi_limits()
+
+    # Offsets shrink according to current ROI size.
+    main.ui.spin_roi_x.setMaximum.assert_called_with(20)
+    main.ui.spin_roi_y.setMaximum.assert_called_with(20)
+    # ROI size limits stay tied to frame size, not offset.
+    main.ui.spin_roi_w.setMaximum.assert_called_with(320)
+    main.ui.spin_roi_h.setMaximum.assert_called_with(240)
+
+
+def test_start_resolution_probe_queues_when_thread_running(patched_deps):
+    main = make_main_mock(camera=None)
+    ac = AppController(main)
+    running_thread = MagicMock()
+    running_thread.isRunning.return_value = True
+    ac._resolution_probe_thread = running_thread
+    prev_req_id = ac._resolution_probe_request_id
+
+    ac._start_resolution_probe(2)
+
+    assert ac._pending_probe_camera_index == 2
+    assert ac._resolution_probe_request_id == prev_req_id
+
+
+def test_on_resolution_probe_finished_starts_pending_probe(patched_deps, monkeypatch):
+    CM, FB, VP, vp = patched_deps
+    cam = MagicMock()
+    cam.index = 1
+    cam.selected_resolution = None
+    CM.return_value.current_camera.return_value = cam
+    main = make_main_mock(camera=None)
+    ac = AppController(main)
+    ac.main.camera = cam
+    ac._active_probe_request_id = 7
+    ac._pending_probe_camera_index = 3
+
+    started = []
+    monkeypatch.setattr(ac, "_start_resolution_probe", lambda idx: started.append(idx))
+    monkeypatch.setattr("app.core.AppController.QTimer.singleShot", lambda _ms, fn: fn())
+
+    ac._on_resolution_probe_finished(7, 1, [(1280, 720)])
+
+    assert started == [3]
+    CM.return_value.set_cached_resolutions.assert_called_with(1, [(1280, 720)])

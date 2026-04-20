@@ -214,9 +214,11 @@ class AppController:
         logger.debug("Обновление списка разрешений для текущей камеры")
         if not self.main.camera:
             self.main.set_camera_resolution_options([], None, self._on_resolution_selected)
+            self.main.ui.button_toggle_capture.setEnabled(False)
             return
         if not isinstance(self.main.camera, Camera):
             self.main.set_camera_resolution_options([], None, self._on_resolution_selected)
+            self.main.ui.button_toggle_capture.setEnabled(False)
             return
 
         cached = self.camera_manager.get_cached_resolutions(self.main.camera.index)

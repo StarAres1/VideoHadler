@@ -56,6 +56,9 @@ class Camera(QObject):
         self.show_roi_content = False
         self.supported_resolutions = []
         self.selected_resolution = None
+        self.preview_paused = False
+        self.last_preview_before_rgb = None
+        self.last_preview_after_rgb = None
 
     def set_method_for_contrast(self, method):
         self.method_for_contrast = method
@@ -186,6 +189,8 @@ class Camera(QObject):
 
     @pyqtSlot(QPixmap)
     def display_frame(self, pixmap):
+        if self.preview_paused:
+            return
         if pixmap is not None:
             pixmap = pixmap.scaled(self.video_frame.size(),
                                           Qt.AspectRatioMode.KeepAspectRatio,

@@ -145,13 +145,31 @@ class TestFrameProcessorProcess:
         fp.nn_selector = mock_nn
         fp.config.nn_skip_frames = 2
 
+        for _ in range(3):
+            fp.process(
+                rgb_frame, 30, 20, 0, 0, 30, 20, ContrastImprovement.nn, NoiseReduction.NotReduction
+            )
+        # Кадр 1 — predict; 2–3 — пропуск (только apply)
+        assert mock_nn.predict_label.call_count == 1
+
         fp.process(
             rgb_frame, 30, 20, 0, 0, 30, 20, ContrastImprovement.nn, NoiseReduction.NotReduction
         )
-        fp.process(
-            rgb_frame, 30, 20, 0, 0, 30, 20, ContrastImprovement.nn, NoiseReduction.NotReduction
-        )
-        fp.process(
-            rgb_frame, 30, 20, 0, 0, 30, 20, ContrastImprovement.nn, NoiseReduction.NotReduction
-        )
-        assert mock_nn.predict_label.call_count >= 1
+        # Кадр 4 — снова predict
+        assert mock_nn.predict_label.call_count == 2
+
+    def test_nn_failed_predict_does_not_start_skip_window(self, rgb_frame):
+        """При пустом ответе сети не включаем окно пропуска — следующий кадр снова вызывает predict."""
+        mock_nn = MagicMock()
+        mock_nn.predict_label.return_value = None
+        mock_nn.apply_label.side_effect = lambda f, _: f
+
+        fp = FrameProcessor()
+        fp.nn_selector = mock_nn
+        fp.config.nn_skip_frames = 5
+
+        for _ in range(4):
+            fp.process(
+                rgb_frame, 30, 20, 0, 0, 30, 20, ContrastImprovement.nn, NoiseReduction.NotReduction
+            )
+        assert mock_nn.predict_label.call_count == 4

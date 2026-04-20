@@ -1,6 +1,6 @@
 """Shared fixtures for QtTrial tests."""
 
-from __future__ import annotations
+#from __future__ import annotations
 
 import os
 import sys
@@ -40,3 +40,20 @@ def pytest_configure(config):
     # Headless / CI-friendly Qt when supported
     if os.environ.get("QT_QPA_PLATFORM") is None and sys.platform != "win32":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+def pytest_assertrepr_compare(op, left, right):
+    """Более явный вывод при падении assert-сравнений."""
+    if op == "==":
+        return [
+            "Проверка равенства не прошла:",
+            f"  Ожидалось: {right!r}",
+            f"  Получено:  {left!r}",
+        ]
+    if op == "!=":
+        return [
+            "Проверка неравенства не прошла:",
+            f"  Левое значение:  {left!r}",
+            f"  Правое значение: {right!r}",
+        ]
+    return None

@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime
 
+import numpy as np
 from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QTimer, QEvent, QRect, QSize, QThread
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QMainWindow
@@ -11,10 +12,34 @@ from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
 from forms.dialog_clahe_ui import Ui_Dialog as ClaheWindow
 from forms.dialog_adjust_contrast_ui import Ui_Dialog as AdjustWindow
 from app.neural_network.NNContrastSelector import NN_SELECTOR
+from app.core.frame_statistics_metrics import (
+    FrameStatsDialog,
+    IqaMetricsCalculator,
+    extract_l_channel_norm,
+    histogram_pixmaps_l_pair,
+    metric_bundle_l,
+    metric_bundle_rgb,
+    pct_gain,
+)
 
 logger = logging.getLogger(__name__)
 
 _ROI_METHOD_NAMES = frozenset({"set_roi_x", "set_roi_y", "set_roi_width", "set_roi_height"})
+
+_FRAME_METRICS = (
+    ("RMS contrast (L)", "rms", 1),
+    ("Weber contrast (L)", "weber", 1),
+    ("Michelson contrast (L)", "michelson", 1),
+    ("Laplacian variance (L)", "lap_var", 1),
+    ("Tenengrad sharpness (L)", "tenengrad", 1),
+    ("EME contrast (L)", "eme", 1),
+    ("Brenner sharpness (L)", "brenner", 1),
+    ("Edge density (L)", "edge_density", 1),
+    ("Entropy (L)", "entropy", 1),
+    ("BRISQUE (RGB)", "brisque_rgb", -1),
+    ("NIQE (RGB)", "niqe_rgb", -1),
+    ("PIQE (RGB)", "piqe_rgb", -1),
+)
 
 
 class NNModelLoadWorker(QObject):
@@ -49,6 +74,10 @@ class MainWindow(QMainWindow):
         self.nn_loader_thread = None
         self.nn_loader_worker = None
         self.nn_progress_dialog = None
+        self._iqa_calc = IqaMetricsCalculator()
+        self._frame_stats_dialog = None
+        self._frame_stats_resume_file = False
+        self._frame_stats_camera_was_paused = False
         self.resolution_radio_buttons = []
         self.resolution_selected_callback = None
         self._setup_static_ui()
@@ -67,6 +96,9 @@ class MainWindow(QMainWindow):
         self.bt_disable_roi = QtWidgets.QPushButton("Отключить ROI", self.ui.roi_group)
         self.ui.gridLayout_6.addWidget(self.bt_disable_roi, 5, 0, 1, 4)
         self.bt_disable_roi.clicked.connect(self.disable_roi)
+        self.button_frame_stats = QtWidgets.QPushButton("Статистика по кадру", self.ui.view_mode_group)
+        self.ui.view_mode_layout.addWidget(self.button_frame_stats)
+        self.button_frame_stats.clicked.connect(self.show_frame_statistics_dialog)
         self.ui.video_frame_label.installEventFilter(self)
         self.ui.video_frame_label.setMouseTracking(True)
         self._set_processing_blocks_enabled(False)
@@ -90,6 +122,7 @@ class MainWindow(QMainWindow):
             self.resolution_layout.removeWidget(rb)
             rb.deleteLater()
         self.resolution_radio_buttons = []
+        self.ui.button_toggle_capture.setEnabled(True)
 
         if not resolutions:
             self.resolution_hint.setText("Не удалось определить поддерживаемые разрешения")
@@ -114,6 +147,7 @@ class MainWindow(QMainWindow):
             rb.deleteLater()
         self.resolution_radio_buttons = []
         self.resolution_hint.setText("Поиск поддерживаемых разрешений...")
+        self.ui.button_toggle_capture.setEnabled(False)
 
     def _on_resolution_radio_toggled(self, checked: bool, width: int, height: int):
         if not checked:
@@ -493,6 +527,77 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Скриншот сохранен: {path}", 4000)
         else:
             self.statusBar().showMessage("Не удалось сохранить скриншот", 3000)
+
+    def _get_current_frame_pair_for_statistics(self):
+        if self.camera and getattr(self.camera, "flag_capture", False):
+            before = getattr(self.camera, "last_preview_before_rgb", None)
+            after = getattr(self.camera, "last_preview_after_rgb", None)
+            if before is not None and after is not None:
+                return before.copy(), after.copy(), "camera"
+        if self.videoPlayer and self.videoPlayer.is_loaded():
+            before, after = self.videoPlayer.get_frame_pair_for_statistics()
+            if before is not None and after is not None:
+                return before, after, "file"
+        return None, None, None
+
+    def _pause_preview_for_stats(self, source: str):
+        self._frame_stats_resume_file = False
+        self._frame_stats_camera_was_paused = False
+        if source == "camera" and self.camera:
+            self._frame_stats_camera_was_paused = bool(getattr(self.camera, "preview_paused", False))
+            self.camera.preview_paused = True
+            logger.info("Статистика кадра: предпросмотр камеры приостановлен")
+            return
+        if source == "file" and self.videoPlayer and self.videoPlayer.is_loaded():
+            self._frame_stats_resume_file = self.videoPlayer.is_playing()
+            if self._frame_stats_resume_file:
+                self.videoPlayer.pause()
+            logger.info("Статистика кадра: воспроизведение файла приостановлено")
+
+    def _resume_preview_after_stats(self):
+        if self.camera and getattr(self.camera, "flag_capture", False):
+            self.camera.preview_paused = self._frame_stats_camera_was_paused
+        if self._frame_stats_resume_file and self.videoPlayer and self.videoPlayer.is_loaded():
+            self.videoPlayer.resume()
+        self._frame_stats_resume_file = False
+        self._frame_stats_camera_was_paused = False
+
+    @pyqtSlot()
+    def show_frame_statistics_dialog(self):
+        before_rgb, after_rgb, source = self._get_current_frame_pair_for_statistics()
+        if before_rgb is None or after_rgb is None:
+            self.statusBar().showMessage("Нет доступного кадра для анализа", 3000)
+            return
+        self._pause_preview_for_stats(source)
+
+        before_l = extract_l_channel_norm(before_rgb)
+        after_l = extract_l_channel_norm(after_rgb)
+        before_rgb_norm = np.clip(before_rgb.astype(np.float32) / 255.0, 0.0, 1.0)
+        after_rgb_norm = np.clip(after_rgb.astype(np.float32) / 255.0, 0.0, 1.0)
+        before_metrics = metric_bundle_l(before_l)
+        after_metrics = metric_bundle_l(after_l)
+        before_metrics.update(metric_bundle_rgb(before_rgb_norm, self._iqa_calc))
+        after_metrics.update(metric_bundle_rgb(after_rgb_norm, self._iqa_calc))
+        rows = []
+        for title, key, direction in _FRAME_METRICS:
+            v_before = float(before_metrics[key])
+            v_after = float(after_metrics[key])
+            rows.append(
+                {
+                    "name": title,
+                    "before": v_before,
+                    "after": v_after,
+                    "pct": pct_gain(v_before, v_after),
+                    "direction": direction,
+                }
+            )
+
+        hist_before, hist_after = histogram_pixmaps_l_pair(before_l, after_l)
+        dlg = FrameStatsDialog(rows, hist_before, hist_after, self)
+        dlg.finished.connect(lambda _: self._resume_preview_after_stats())
+        self._frame_stats_dialog = dlg
+        dlg.show()
+        logger.info("Оператор: открыта статистика по текущему кадру (%s)", source)
 
     @pyqtSlot()
     def show_noise_median_info(self):
