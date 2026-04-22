@@ -10,6 +10,9 @@ class ContrastImprovement(Enum):
     autoGamma = 5
     sigmoid = 6
     nn = 7
+    pipeline = 8
+    zero_dce = 9
+    enlightengan = 10
 
 
 class NoiseReduction(Enum):

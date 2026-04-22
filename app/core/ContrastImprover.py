@@ -63,3 +63,4 @@ class ContrastImprover:
         lab_corrected = cv2.merge([l_corrected, a_channel, b_channel])
         return cv2.cvtColor(lab_corrected, cv2.COLOR_LAB2RGB)
 
+

@@ -175,11 +175,3 @@ class TestRoiSelectionUpdatesSpinBoxes:
         assert main_win.ui.spin_roi_x.value() > 0
         assert main_win.ui.spin_roi_y.value() > 0
 
-
-class TestClaheDialogOpens:
-    def test_dialog_visible_when_source_ready(self, main_win, qtbot):
-        main_win.videoPlayer = MagicMock()
-        main_win.videoPlayer.is_loaded.return_value = True
-        main_win.show_dialog_CLAHE()
-        qtbot.waitUntil(lambda: getattr(main_win, "dialog_clahe", None) is not None, timeout=2000)
-        assert main_win.dialog_clahe.isVisible()

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.core.AppController import AppController
+from app.core.Enums import ContrastImprovement
 
 
 def _ui_names():
@@ -243,23 +244,44 @@ def test_start_resolution_probe_queues_when_thread_running(patched_deps):
     assert ac._resolution_probe_request_id == prev_req_id
 
 
-def test_on_resolution_probe_finished_starts_pending_probe(patched_deps, monkeypatch):
-    CM, FB, VP, vp = patched_deps
-    cam = MagicMock()
-    cam.index = 1
-    cam.selected_resolution = None
-    CM.return_value.current_camera.return_value = cam
-    main = make_main_mock(camera=None)
+def test_operator_contrast_updates_camera_and_player_state(patched_deps):
+    main = make_main_mock()
     ac = AppController(main)
-    ac.main.camera = cam
-    ac._active_probe_request_id = 7
-    ac._pending_probe_camera_index = 3
+    cam = MagicMock()
+    cam.video_handler = MagicMock()
+    cam.video_handler.processor = MagicMock()
+    cam.video_handler.processor.config = MagicMock()
+    vp = MagicMock()
+    vp.processor = MagicMock()
+    vp.processor.config = MagicMock()
+    main.camera = cam
+    main.videoPlayer = vp
 
-    started = []
-    monkeypatch.setattr(ac, "_start_resolution_probe", lambda idx: started.append(idx))
-    monkeypatch.setattr("app.core.AppController.QTimer.singleShot", lambda _ms, fn: fn())
+    ac._operator_contrast(ContrastImprovement.CLAHE, "CLAHE")
 
-    ac._on_resolution_probe_finished(7, 1, [(1280, 720)])
+    assert main._contrast_pipeline_methods == []
+    assert cam.contrast_pipeline == []
+    assert cam.video_handler.processor.config.contrast_pipeline == []
+    assert vp.processor.config.contrast_pipeline == []
+    cam.set_method_for_contrast.assert_called_once_with(ContrastImprovement.CLAHE)
+    vp.set_method_for_contrast.assert_called_once_with(ContrastImprovement.CLAHE)
 
-    assert started == [3]
-    CM.return_value.set_cached_resolutions.assert_called_with(1, [(1280, 720)])
+
+def test_on_contrast_radio_toggled_ignored_when_unchecked(patched_deps):
+    main = make_main_mock()
+    ac = AppController(main)
+    ac._operator_contrast = MagicMock()
+
+    ac._on_contrast_radio_toggled(False, ContrastImprovement.gamma, "гамма")
+
+    ac._operator_contrast.assert_not_called()
+
+
+def test_on_contrast_radio_toggled_calls_operator_when_checked(patched_deps):
+    main = make_main_mock()
+    ac = AppController(main)
+    ac._operator_contrast = MagicMock()
+
+    ac._on_contrast_radio_toggled(True, ContrastImprovement.gamma, "гамма")
+
+    ac._operator_contrast.assert_called_once_with(ContrastImprovement.gamma, "гамма")

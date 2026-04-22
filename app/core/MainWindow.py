@@ -3,55 +3,18 @@ import os
 from datetime import datetime
 
 import numpy as np
-from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QTimer, QEvent, QRect, QSize, QThread
+from PyQt6.QtCore import pyqtSlot, QTimer, QEvent, QRect, QSize
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QMainWindow
 from forms.main_window_ui import Ui_MainWindow
-from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
-
-from forms.dialog_clahe_ui import Ui_Dialog as ClaheWindow
-from forms.dialog_adjust_contrast_ui import Ui_Dialog as AdjustWindow
-from app.neural_network.NNContrastSelector import NN_SELECTOR
-from app.core.frame_statistics_metrics import (
-    FrameStatsDialog,
-    IqaMetricsCalculator,
-    extract_l_channel_norm,
-    histogram_pixmaps_l_pair,
-    metric_bundle_l,
-    metric_bundle_rgb,
-    pct_gain,
-)
+from app.neural_network.nn_loader_ui import ensure_nn_model_loaded_async
+from app.core.Enums import ContrastImprovement
+from app.core.ui_panels import processing_dialogs
+from app.core.ui_panels.frame_statistics_metrics import IqaMetricsCalculator, show_frame_statistics_dialog
 
 logger = logging.getLogger(__name__)
 
 _ROI_METHOD_NAMES = frozenset({"set_roi_x", "set_roi_y", "set_roi_width", "set_roi_height"})
-
-_FRAME_METRICS = (
-    ("RMS contrast (L)", "rms", 1),
-    ("Weber contrast (L)", "weber", 1),
-    ("Michelson contrast (L)", "michelson", 1),
-    ("Laplacian variance (L)", "lap_var", 1),
-    ("Tenengrad sharpness (L)", "tenengrad", 1),
-    ("EME contrast (L)", "eme", 1),
-    ("Brenner sharpness (L)", "brenner", 1),
-    ("Edge density (L)", "edge_density", 1),
-    ("Entropy (L)", "entropy", 1),
-    ("BRISQUE (RGB)", "brisque_rgb", -1),
-    ("NIQE (RGB)", "niqe_rgb", -1),
-    ("PIQE (RGB)", "piqe_rgb", -1),
-)
-
-
-class NNModelLoadWorker(QObject):
-    progress = pyqtSignal(int, str)
-    finished = pyqtSignal(bool, str)
-
-    @pyqtSlot()
-    def run(self):
-        logger.info("Фоновая загрузка модели NNContrastSelector: старт")
-        ok = NN_SELECTOR.ensure_loaded_with_progress(lambda v, t: self.progress.emit(v, t))
-        logger.info("Фоновая загрузка модели NNContrastSelector: завершено ok=%s", ok)
-        self.finished.emit(ok, NN_SELECTOR.last_error)
 
 
 class MainWindow(QMainWindow):
@@ -74,12 +37,24 @@ class MainWindow(QMainWindow):
         self.nn_loader_thread = None
         self.nn_loader_worker = None
         self.nn_progress_dialog = None
+        self.zero_dce_loader_thread = None
+        self.zero_dce_loader_worker = None
+        self.zero_dce_progress_dialog = None
+        self.zero_dce_progress_label = None
+        self.zero_dce_progress_bar = None
+        self.enlightengan_loader_thread = None
+        self.enlightengan_loader_worker = None
+        self.enlightengan_progress_dialog = None
+        self.enlightengan_progress_label = None
+        self.enlightengan_progress_bar = None
         self._iqa_calc = IqaMetricsCalculator()
         self._frame_stats_dialog = None
         self._frame_stats_resume_file = False
         self._frame_stats_camera_was_paused = False
         self.resolution_radio_buttons = []
         self.resolution_selected_callback = None
+        self._contrast_pipeline_dialog = None
+        self._contrast_pipeline_methods = []
         self._setup_static_ui()
 
     def _setup_static_ui(self):
@@ -98,7 +73,22 @@ class MainWindow(QMainWindow):
         self.bt_disable_roi.clicked.connect(self.disable_roi)
         self.button_frame_stats = QtWidgets.QPushButton("Статистика по кадру", self.ui.view_mode_group)
         self.ui.view_mode_layout.addWidget(self.button_frame_stats)
-        self.button_frame_stats.clicked.connect(self.show_frame_statistics_dialog)
+        self.button_frame_stats.clicked.connect(lambda: show_frame_statistics_dialog(self))
+        self.radio_contrast_pipeline = QtWidgets.QRadioButton("Цепочка методов", self.ui.contrast_group)
+        self.ui.main_layout.addWidget(self.radio_contrast_pipeline, 10, 0, 1, 1)
+        self.button_contrast_pipeline_info = QtWidgets.QToolButton(self.ui.contrast_group)
+        self.button_contrast_pipeline_info.setText("...")
+        self.ui.main_layout.addWidget(self.button_contrast_pipeline_info, 10, 1, 1, 1)
+        self.radio_contrast_zero_dce = QtWidgets.QRadioButton("Zero-DCE", self.ui.contrast_group)
+        self.ui.main_layout.addWidget(self.radio_contrast_zero_dce, 11, 0, 1, 1)
+        self.button_zero_dce_info = QtWidgets.QToolButton(self.ui.contrast_group)
+        self.button_zero_dce_info.setText("...")
+        self.ui.main_layout.addWidget(self.button_zero_dce_info, 11, 1, 1, 1)
+        self.radio_contrast_enlightengan = QtWidgets.QRadioButton("EnlightenGAN", self.ui.contrast_group)
+        self.ui.main_layout.addWidget(self.radio_contrast_enlightengan, 12, 0, 1, 1)
+        self.button_enlightengan_info = QtWidgets.QToolButton(self.ui.contrast_group)
+        self.button_enlightengan_info.setText("...")
+        self.ui.main_layout.addWidget(self.button_enlightengan_info, 12, 1, 1, 1)
         self.ui.video_frame_label.installEventFilter(self)
         self.ui.video_frame_label.setMouseTracking(True)
         self._set_processing_blocks_enabled(False)
@@ -106,6 +96,38 @@ class MainWindow(QMainWindow):
         self.ui.playback_group.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         self.ui.playback_group.setFixedHeight(self.ui.playback_group.sizeHint().height())
         self._init_resolution_controls()
+
+    @staticmethod
+    def _method_param_title(method: ContrastImprovement) -> str:
+        titles = {
+            ContrastImprovement.CLAHE: "Параметры CLAHE",
+            ContrastImprovement.adjust_contrast: "Параметры линейного преобразования",
+            ContrastImprovement.gamma: "Параметры гамма-коррекции",
+            ContrastImprovement.sigmoid: "Параметры сигмоидной коррекции",
+            ContrastImprovement.autoGamma: "Параметры автогаммы",
+            ContrastImprovement.nn: "Параметры нейросетевого метода",
+            ContrastImprovement.zero_dce: "Параметры Zero-DCE",
+            ContrastImprovement.enlightengan: "Параметры EnlightenGAN",
+        }
+        return titles.get(method, "Параметры метода")
+
+    def _configure_pipeline_method(self, method: ContrastImprovement):
+        if method == ContrastImprovement.CLAHE:
+            processing_dialogs.show_dialog_clahe(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.adjust_contrast:
+            processing_dialogs.show_dialog_adjust_contrast(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.gamma:
+            processing_dialogs.show_gamma_info(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.sigmoid:
+            processing_dialogs.show_sigmoid_info(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.autoGamma:
+            processing_dialogs.show_auto_gamma_info(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.nn:
+            processing_dialogs.show_nn_auto_info(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.zero_dce:
+            processing_dialogs.show_zero_dce_info(self, self._apply_to_active_sources)
+        elif method == ContrastImprovement.enlightengan:
+            processing_dialogs.show_enlightengan_info(self, self._apply_to_active_sources)
 
     def _init_resolution_controls(self):
         self.resolution_group = QtWidgets.QGroupBox("Разрешение камеры", self.ui.group_camera_capture)
@@ -554,6 +576,68 @@ class MainWindow(QMainWindow):
                 self.videoPlayer.pause()
             logger.info("Статистика кадра: воспроизведение файла приостановлено")
 
+    @staticmethod
+    def _contrast_method_display_name(method: ContrastImprovement) -> str:
+        mapping = {
+            ContrastImprovement.NotImprove: "Без улучшения",
+            ContrastImprovement.CLAHE: "CLAHE",
+            ContrastImprovement.adjust_contrast: "Линейное преобразование",
+            ContrastImprovement.HE: "Эквализация гистограммы (HE)",
+            ContrastImprovement.gamma: "Гамма-коррекция",
+            ContrastImprovement.autoGamma: "Автогамма",
+            ContrastImprovement.sigmoid: "Сигмоидная коррекция",
+            ContrastImprovement.nn: "Автоподбор нейросетью",
+            ContrastImprovement.pipeline: "Цепочка методов",
+            ContrastImprovement.zero_dce: "Zero-DCE",
+            ContrastImprovement.enlightengan: "EnlightenGAN",
+        }
+        return mapping.get(method, str(method))
+
+    def _contrast_method_with_params(self, method: ContrastImprovement, processor) -> str:
+        cfg = processor.config
+        name = self._contrast_method_display_name(method)
+        if method == ContrastImprovement.CLAHE:
+            return f"{name} (clipLimit={cfg.clip_limit:.2f}, tileGrid={cfg.tile_grid_size})"
+        if method == ContrastImprovement.adjust_contrast:
+            return f"{name} (alpha={cfg.alpha:.2f}, beta={cfg.beta})"
+        if method == ContrastImprovement.gamma:
+            return f"{name} (gamma={cfg.gamma:.2f})"
+        if method == ContrastImprovement.autoGamma:
+            return f"{name} (target_brightness={cfg.auto_gamma_target_brightness})"
+        if method == ContrastImprovement.sigmoid:
+            return f"{name} (cutoff={cfg.sigmoid_cutoff:.2f}, gain={cfg.sigmoid_gain:.2f})"
+        if method == ContrastImprovement.nn:
+            nn_label = getattr(processor, "_nn_last_label", "") or "не определён"
+            return f"{name} (skip_frames={cfg.nn_skip_frames}, выбранный метод={nn_label})"
+        if method == ContrastImprovement.zero_dce:
+            return f"{name} (strength={cfg.zero_dce_strength:.2f})"
+        if method == ContrastImprovement.enlightengan:
+            return f"{name} (strength={cfg.enlightengan_strength:.2f})"
+        return name
+
+    def _build_applied_contrast_text(self, source: str) -> str:
+        if source == "camera" and self.camera:
+            processor = self.camera.video_handler.processor if self.camera.video_handler else None
+            method = self.camera.method_for_contrast
+            pipeline = list(getattr(self.camera, "contrast_pipeline", []) or [])
+        elif source == "file" and self.videoPlayer:
+            processor = self.videoPlayer.processor
+            method = self.videoPlayer.method_for_contrast
+            pipeline = list(getattr(self.videoPlayer.processor.config, "contrast_pipeline", []) or [])
+        else:
+            return "Источник не определён."
+
+        if processor is None:
+            return "Обработчик кадров недоступен."
+
+        if method == ContrastImprovement.pipeline:
+            if not pipeline:
+                return "Режим: цепочка методов. Цепочка пустая."
+            chain = [self._contrast_method_with_params(m, processor) for m in pipeline]
+            return "Режим: цепочка методов.\nПоследовательность:\n" + "\n".join(f"{idx+1}. {entry}" for idx, entry in enumerate(chain))
+
+        return "Режим: одиночный метод.\n" + self._contrast_method_with_params(method, processor)
+
     def _resume_preview_after_stats(self):
         if self.camera and getattr(self.camera, "flag_capture", False):
             self.camera.preview_paused = self._frame_stats_camera_was_paused
@@ -562,339 +646,16 @@ class MainWindow(QMainWindow):
         self._frame_stats_resume_file = False
         self._frame_stats_camera_was_paused = False
 
-    @pyqtSlot()
-    def show_frame_statistics_dialog(self):
-        before_rgb, after_rgb, source = self._get_current_frame_pair_for_statistics()
-        if before_rgb is None or after_rgb is None:
-            self.statusBar().showMessage("Нет доступного кадра для анализа", 3000)
-            return
-        self._pause_preview_for_stats(source)
-
-        before_l = extract_l_channel_norm(before_rgb)
-        after_l = extract_l_channel_norm(after_rgb)
-        before_rgb_norm = np.clip(before_rgb.astype(np.float32) / 255.0, 0.0, 1.0)
-        after_rgb_norm = np.clip(after_rgb.astype(np.float32) / 255.0, 0.0, 1.0)
-        before_metrics = metric_bundle_l(before_l)
-        after_metrics = metric_bundle_l(after_l)
-        before_metrics.update(metric_bundle_rgb(before_rgb_norm, self._iqa_calc))
-        after_metrics.update(metric_bundle_rgb(after_rgb_norm, self._iqa_calc))
-        rows = []
-        for title, key, direction in _FRAME_METRICS:
-            v_before = float(before_metrics[key])
-            v_after = float(after_metrics[key])
-            rows.append(
-                {
-                    "name": title,
-                    "before": v_before,
-                    "after": v_after,
-                    "pct": pct_gain(v_before, v_after),
-                    "direction": direction,
-                }
-            )
-
-        hist_before, hist_after = histogram_pixmaps_l_pair(before_l, after_l)
-        dlg = FrameStatsDialog(rows, hist_before, hist_after, self)
-        dlg.finished.connect(lambda _: self._resume_preview_after_stats())
-        self._frame_stats_dialog = dlg
-        dlg.show()
-        logger.info("Оператор: открыта статистика по текущему кадру (%s)", source)
-
-    @pyqtSlot()
-    def show_noise_median_info(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Настройки медианного фильтра")
-        layout = QtWidgets.QGridLayout(dialog)
-        label_record_format = QtWidgets.QLabel("Размер ядра")
-        slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        slider.setMinimum(1)
-        slider.setMaximum(30)
-        spin = QtWidgets.QSpinBox()
-        spin.setMinimum(3)
-        spin.setMaximum(61)
-        layout.addWidget(label_record_format, 0, 0)
-        layout.addWidget(slider, 0, 1)
-        layout.addWidget(spin, 0, 2)
-        self.sl_sp_median = SpinBox_Slider(
-            slider,
-            spin,
-            lambda value: self._apply_to_active_sources("set_median_ksize", value),
-            1,
-            3,
-            lambda v: max(3, v * 2 + 1),
-            lambda v: max(1, int((v - 1) / 2))
-        )
-        dialog.show()
-        self.dialog_median = dialog
-
-    @pyqtSlot()
-    def show_noise_nlm_info(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Настройки быстрого гауссова шумоподавления")
-        layout = QtWidgets.QGridLayout(dialog)
-
-        lbl_k = QtWidgets.QLabel("Размер ядра")
-        sld_k = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        sld_k.setMinimum(1)
-        sld_k.setMaximum(30)
-        spn_k = QtWidgets.QSpinBox()
-        spn_k.setMinimum(3)
-        spn_k.setMaximum(61)
-
-        lbl_sigma = QtWidgets.QLabel("Сигма")
-        sld_sigma = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        sld_sigma.setMinimum(1)
-        sld_sigma.setMaximum(30)
-        spn_sigma = QtWidgets.QDoubleSpinBox()
-        spn_sigma.setMinimum(0.1)
-        spn_sigma.setMaximum(3.0)
-        spn_sigma.setSingleStep(0.1)
-
-        layout.addWidget(lbl_k, 0, 0)
-        layout.addWidget(sld_k, 0, 1)
-        layout.addWidget(spn_k, 0, 2)
-        layout.addWidget(lbl_sigma, 1, 0)
-        layout.addWidget(sld_sigma, 1, 1)
-        layout.addWidget(spn_sigma, 1, 2)
-
-        self.sl_sp_fast_gauss_k = SpinBox_Slider(
-            sld_k, spn_k, lambda value: self._apply_to_active_sources("set_fast_gaussian_ksize", value),
-            1, 3, lambda v: max(3, v * 2 + 1), lambda v: max(1, int((v - 1) / 2))
-        )
-        self.sl_sp_fast_gauss_sigma = SpinBox_Slider(
-            sld_sigma, spn_sigma, lambda value: self._apply_to_active_sources("set_fast_gaussian_sigma", value),
-            10, 1.0, SpinBox_Slider.pow10_int, SpinBox_Slider.dec10_float
-        )
-
-        dialog.show()
-        self.dialog_fast_gaussian = dialog
-
     def ask_user_confirmation(self, title: str, text: str) -> bool:
-        result = QtWidgets.QMessageBox.question(
-            self,
-            title,
-            text,
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-            QtWidgets.QMessageBox.StandardButton.No
-        )
-        return result == QtWidgets.QMessageBox.StandardButton.Yes
-
-    @pyqtSlot()
-    def show_gamma_info(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Настройки гамма-коррекции")
-        layout = QtWidgets.QGridLayout(dialog)
-        label_record_format = QtWidgets.QLabel("Гамма")
-        slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        slider.setMinimum(2)
-        slider.setMaximum(50)
-        spin = QtWidgets.QDoubleSpinBox()
-        spin.setMinimum(0.2)
-        spin.setMaximum(5.0)
-        spin.setSingleStep(0.1)
-        layout.addWidget(label_record_format, 0, 0)
-        layout.addWidget(slider, 0, 1)
-        layout.addWidget(spin, 0, 2)
-        self.sl_sp_gamma = SpinBox_Slider(
-            slider,
-            spin,
-            lambda value: self._apply_to_active_sources("set_gamma_value", value),
-            15,
-            1.5,
-            SpinBox_Slider.pow10_int,
-            SpinBox_Slider.dec10_float
-        )
-        dialog.show()
-        self.dialog_gamma = dialog
-
-    @pyqtSlot()
-    def show_sigmoid_info(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Настройки сигмоидной коррекции")
-        layout = QtWidgets.QGridLayout(dialog)
-
-        label_cutoff = QtWidgets.QLabel("Отсечка")
-        slider_cutoff = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        slider_cutoff.setMinimum(1)
-        slider_cutoff.setMaximum(99)
-        spin_cutoff = QtWidgets.QDoubleSpinBox()
-        spin_cutoff.setMinimum(0.01)
-        spin_cutoff.setMaximum(0.99)
-        spin_cutoff.setSingleStep(0.01)
-
-        label_gain = QtWidgets.QLabel("Коэффициент")
-        slider_gain = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        slider_gain.setMinimum(1)
-        slider_gain.setMaximum(30)
-        spin_gain = QtWidgets.QSpinBox()
-        spin_gain.setMinimum(1)
-        spin_gain.setMaximum(30)
-
-        layout.addWidget(label_cutoff, 0, 0)
-        layout.addWidget(slider_cutoff, 0, 1)
-        layout.addWidget(spin_cutoff, 0, 2)
-        layout.addWidget(label_gain, 1, 0)
-        layout.addWidget(slider_gain, 1, 1)
-        layout.addWidget(spin_gain, 1, 2)
-
-        self.sl_sp_sigmoid_cutoff = SpinBox_Slider(
-            slider_cutoff,
-            spin_cutoff,
-            lambda value: self._apply_to_active_sources("set_sigmoid_cutoff", value),
-            50,
-            0.5,
-            lambda v: int(v * 100),
-            lambda v: float(v / 100.0)
-        )
-        self.sl_sp_sigmoid_gain = SpinBox_Slider(
-            slider_gain,
-            spin_gain,
-            lambda value: self._apply_to_active_sources("set_sigmoid_gain", value),
-            12,
-            12
-        )
-        dialog.show()
-        self.dialog_sigmoid = dialog
-
-    @pyqtSlot()
-    def show_auto_gamma_info(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Настройки авто-гаммы")
-        layout = QtWidgets.QGridLayout(dialog)
-        label_record_format = QtWidgets.QLabel("Целевая яркость")
-        slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        slider.setMinimum(1)
-        slider.setMaximum(254)
-        spin = QtWidgets.QSpinBox()
-        spin.setMinimum(1)
-        spin.setMaximum(254)
-        layout.addWidget(label_record_format, 0, 0)
-        layout.addWidget(slider, 0, 1)
-        layout.addWidget(spin, 0, 2)
-        self.sl_sp_auto_gamma = SpinBox_Slider(slider, spin, lambda value: self._apply_to_active_sources("set_auto_gamma_target_brightness", value), 128, 128)
-        dialog.show()
-        self.dialog_auto_gamma = dialog
-
-    @pyqtSlot()
-    def show_nn_auto_info(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle("Настройки автоподбора нейросетью")
-        layout = QtWidgets.QGridLayout(dialog)
-        label_record_format = QtWidgets.QLabel("Пропуск кадров после анализа")
-        slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        slider.setMinimum(0)
-        slider.setMaximum(60)
-        spin = QtWidgets.QSpinBox()
-        spin.setMinimum(0)
-        spin.setMaximum(60)
-        layout.addWidget(label_record_format, 0, 0)
-        layout.addWidget(slider, 0, 1)
-        layout.addWidget(spin, 0, 2)
-        self.sl_sp_nn_skip = SpinBox_Slider(
-            slider,
-            spin,
-            lambda value: self._apply_to_active_sources("set_nn_skip_frames", value),
-            0,
-            0
-        )
-        dialog.show()
-        self.dialog_nn_auto = dialog
-
-    def ensure_nn_model_loaded_async(self):
-        if NN_SELECTOR.is_loaded() or NN_SELECTOR.is_loading():
-            logger.debug("Загрузка NN: модель уже загружена или загрузка идёт")
-            return
-        logger.info("Запуск фонового потока загрузки модели контраста (NN)")
-        self.nn_progress_dialog = QtWidgets.QDialog(self)
-        self.nn_progress_dialog.setWindowTitle("Загрузка нейросети")
-        self.nn_progress_dialog.setModal(False)
-        layout = QtWidgets.QVBoxLayout(self.nn_progress_dialog)
-        self.nn_progress_label = QtWidgets.QLabel("Подготовка...")
-        self.nn_progress_bar = QtWidgets.QProgressBar()
-        self.nn_progress_bar.setRange(0, 100)
-        self.nn_progress_bar.setValue(0)
-        layout.addWidget(self.nn_progress_label)
-        layout.addWidget(self.nn_progress_bar)
-        self.nn_progress_dialog.show()
-
-        self.nn_loader_thread = QThread(self)
-        self.nn_loader_worker = NNModelLoadWorker()
-        self.nn_loader_worker.moveToThread(self.nn_loader_thread)
-        self.nn_loader_thread.started.connect(self.nn_loader_worker.run)
-        self.nn_loader_worker.progress.connect(self._on_nn_load_progress)
-        self.nn_loader_worker.finished.connect(self._on_nn_load_finished)
-        self.nn_loader_worker.finished.connect(self.nn_loader_thread.quit)
-        self.nn_loader_worker.finished.connect(self.nn_loader_worker.deleteLater)
-        self.nn_loader_thread.finished.connect(self.nn_loader_thread.deleteLater)
-        self.nn_loader_thread.start()
-
-    @pyqtSlot(int, str)
-    def _on_nn_load_progress(self, value: int, text: str):
-        if self.nn_progress_bar:
-            self.nn_progress_bar.setValue(value)
-        if self.nn_progress_label:
-            self.nn_progress_label.setText(text)
-
-    @pyqtSlot(bool, str)
-    def _on_nn_load_finished(self, ok: bool, error: str):
-        logger.info("Загрузка модели контраста завершена ok=%s", ok)
-        if self.nn_progress_dialog:
-            self.nn_progress_dialog.close()
-            self.nn_progress_dialog = None
-        if not ok:
-            logger.error("Ошибка загрузки нейросети: %s", error)
-            self.statusBar().showMessage(f"Ошибка загрузки нейросети: {error}", 5000)
-
-    @pyqtSlot()
-    def show_dialog_CLAHE(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        self.dialog_clahe = QtWidgets.QDialog()
-        self.ui_dialog_clahe = ClaheWindow()
-        self.ui_dialog_clahe.setupUi(self.dialog_clahe)
-
-        self.sl_sp_titleGrid = SpinBox_Slider(self.ui_dialog_clahe.slider_tile_grid, self.ui_dialog_clahe.spin_tile_grid, lambda value: self._apply_to_active_sources("set_titleGridSize_CLAHE", value),
-                                         4, 4, None, None)
-
-        self.sl_sp_clipLimit = SpinBox_Slider(self.ui_dialog_clahe.slider_clip_limit, self.ui_dialog_clahe.spin_clip_limit, lambda value: self._apply_to_active_sources("set_clipLimit_CLAHE", value),
-                                         4, 2.0, SpinBox_Slider.pow2_int, SpinBox_Slider.dec2_float)
-
-        self.dialog_clahe.show()
-
-    @pyqtSlot()
-    def show_dialog_adjustContrast(self):
-        if not self.camera and not (self.videoPlayer and self.videoPlayer.is_loaded()):
-            self.statusBar().showMessage("Параметры доступны после запуска захвата", 2500)
-            return
-        self.dialog_adjust = QtWidgets.QDialog()
-        self.ui_dialog_adjust = AdjustWindow()
-        self.ui_dialog_adjust.setupUi(self.dialog_adjust)
-
-        self.sl_sp_contrast = SpinBox_Slider(self.ui_dialog_adjust.slider_contrast, self.ui_dialog_adjust.spin_contrast, lambda value: self._apply_to_active_sources("set_alpha_adjust", value),
-                                         10, 1.0, SpinBox_Slider.pow10_int, SpinBox_Slider.dec10_float)
-
-        self.sl_sp_brightness = SpinBox_Slider(self.ui_dialog_adjust.slider_brightness, self.ui_dialog_adjust.spin_brightness, lambda value: self._apply_to_active_sources("set_beta_adjust", value),
-                                         0, 0, None, None)
-
-        self.dialog_adjust.show()
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setIcon(QtWidgets.QMessageBox.Icon.Question)
+        yes_btn = box.addButton("Да", QtWidgets.QMessageBox.ButtonRole.YesRole)
+        no_btn = box.addButton("Нет", QtWidgets.QMessageBox.ButtonRole.NoRole)
+        box.setDefaultButton(no_btn)
+        box.exec()
+        return box.clickedButton() is yes_btn
 
     def _apply_to_active_sources(self, method_name: str, value):
         targets = []

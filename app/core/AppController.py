@@ -7,6 +7,10 @@ from app.core.custom_widgets.FileBrowser import FileBrowser
 from app.core.MainWindow import MainWindow
 from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
 from app.core.VideoPlayer import VideoPlayer
+from app.core.ui_panels import processing_dialogs
+from app.neural_network.enlightengan_loader_ui import ensure_enlightengan_loaded_async
+from app.neural_network.nn_loader_ui import ensure_nn_model_loaded_async
+from app.neural_network.zero_dce_loader_ui import ensure_zero_dce_loaded_async
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
 
 logger = logging.getLogger(__name__)
@@ -103,7 +107,29 @@ class AppController:
 
     def _operator_contrast(self, method: ContrastImprovement, label: str) -> None:
         logger.info("Оператор: метод улучшения контраста «%s»", label)
-        self._apply_to_active_sources("set_method_for_contrast", method)
+        if hasattr(self.main, "_contrast_pipeline_methods"):
+            self.main._contrast_pipeline_methods = []
+        # Reset pipeline without triggering extra refreshes first.
+        # Otherwise, VideoPlayer may render "old method" frame while the new
+        # method update is skipped by in-flight render guard.
+        if self.main.camera:
+            self.main.camera.contrast_pipeline = []
+            if self.main.camera.video_handler:
+                self.main.camera.video_handler.processor.config.contrast_pipeline = []
+        if self.main.videoPlayer:
+            self.main.videoPlayer.processor.config.contrast_pipeline = []
+        if self.main.camera and hasattr(self.main.camera, "set_method_for_contrast"):
+            self.main.camera.set_method_for_contrast(method)
+        if self.main.videoPlayer and hasattr(self.main.videoPlayer, "set_method_for_contrast"):
+            self.main.videoPlayer.set_method_for_contrast(method)
+
+    def _operator_contrast_pipeline(self) -> None:
+        logger.info("Оператор: режим цепочки методов контраста")
+        if self.main.camera and hasattr(self.main.camera, "set_method_for_contrast"):
+            self.main.camera.set_method_for_contrast(ContrastImprovement.pipeline)
+        if self.main.videoPlayer and hasattr(self.main.videoPlayer, "set_method_for_contrast"):
+            self.main.videoPlayer.set_method_for_contrast(ContrastImprovement.pipeline)
+        processing_dialogs.show_contrast_pipeline_dialog(self.main)
 
     def _operator_noise(self, method: NoiseReduction, label: str) -> None:
         logger.info("Оператор: метод шумоподавления «%s»", label)
@@ -120,35 +146,43 @@ class AppController:
 
     def _open_dialog_clahe_info(self) -> None:
         logger.info("Оператор: диалог настроек CLAHE")
-        self.main.show_dialog_CLAHE()
+        processing_dialogs.show_dialog_clahe(self.main, self._apply_to_active_sources)
 
     def _open_dialog_adjust_info(self) -> None:
         logger.info("Оператор: диалог линейной коррекции контраста")
-        self.main.show_dialog_adjustContrast()
+        processing_dialogs.show_dialog_adjust_contrast(self.main, self._apply_to_active_sources)
 
     def _open_dialog_gamma_info(self) -> None:
         logger.info("Оператор: диалог гамма-коррекции")
-        self.main.show_gamma_info()
+        processing_dialogs.show_gamma_info(self.main, self._apply_to_active_sources)
 
     def _open_dialog_sigmoid_info(self) -> None:
         logger.info("Оператор: диалог сигмоидной коррекции")
-        self.main.show_sigmoid_info()
+        processing_dialogs.show_sigmoid_info(self.main, self._apply_to_active_sources)
 
     def _open_dialog_nn_info(self) -> None:
         logger.info("Оператор: диалог авто-нейроконтраста")
-        self.main.show_nn_auto_info()
+        processing_dialogs.show_nn_auto_info(self.main, self._apply_to_active_sources)
+
+    def _open_dialog_zero_dce_info(self) -> None:
+        logger.info("Оператор: диалог Zero-DCE")
+        processing_dialogs.show_zero_dce_info(self.main, self._apply_to_active_sources)
+
+    def _open_dialog_enlightengan_info(self) -> None:
+        logger.info("Оператор: диалог EnlightenGAN")
+        processing_dialogs.show_enlightengan_info(self.main, self._apply_to_active_sources)
 
     def _open_dialog_auto_gamma_info(self) -> None:
         logger.info("Оператор: диалог автогаммы")
-        self.main.show_auto_gamma_info()
+        processing_dialogs.show_auto_gamma_info(self.main, self._apply_to_active_sources)
 
     def _open_dialog_median_noise_info(self) -> None:
         logger.info("Оператор: диалог медианного фильтра")
-        self.main.show_noise_median_info()
+        processing_dialogs.show_noise_median_info(self.main, self._apply_to_active_sources)
 
     def _open_dialog_fast_gauss_info(self) -> None:
         logger.info("Оператор: диалог быстрого гаусса")
-        self.main.show_noise_nlm_info()
+        processing_dialogs.show_noise_fast_gaussian_info(self.main, self._apply_to_active_sources)
 
     def _stop_camera_pipeline(self):
         logger.info("Остановка контура камеры (запись/захват)")
@@ -498,31 +532,39 @@ class AppController:
         self.main.ui.button_toggle_capture.clicked.connect(self._toggle_capture)
         self.main.ui.button_toggle_recording.clicked.connect(self.main.toggle_camera_recording)
         self.main.ui.combo_record_format.currentTextChanged.connect(self._on_record_format_changed)
-        self.main.ui.radio_contrast_clahe.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.CLAHE, "CLAHE")
+        contrast_bindings = (
+            (self.main.ui.radio_contrast_none, ContrastImprovement.NotImprove, "без улучшения"),
+            (self.main.ui.radio_contrast_clahe, ContrastImprovement.CLAHE, "CLAHE"),
+            (self.main.ui.radio_contrast_adjust, ContrastImprovement.adjust_contrast, "линейная коррекция"),
+            (self.main.ui.radio_contrast_he, ContrastImprovement.HE, "выравнивание гистограммы"),
+            (self.main.ui.radio_contrast_gamma, ContrastImprovement.gamma, "гамма"),
+            (self.main.ui.radio_contrast_sigmoid, ContrastImprovement.sigmoid, "сигмоида"),
+            (self.main.ui.radio_contrast_auto_gamma, ContrastImprovement.autoGamma, "автогамма"),
+            (self.main.ui.radio_contrast_nn, ContrastImprovement.nn, "нейросеть (классификация)"),
         )
-        self.main.ui.radio_contrast_none.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.NotImprove, "без улучшения")
+        if hasattr(self.main, "radio_contrast_zero_dce"):
+            contrast_bindings += (
+                (self.main.radio_contrast_zero_dce, ContrastImprovement.zero_dce, "Zero-DCE"),
+            )
+        if hasattr(self.main, "radio_contrast_enlightengan"):
+            contrast_bindings += (
+                (self.main.radio_contrast_enlightengan, ContrastImprovement.enlightengan, "EnlightenGAN"),
+            )
+        for radio, method, label in contrast_bindings:
+            radio.toggled.connect(
+                lambda checked, m=method, l=label: self._on_contrast_radio_toggled(checked, m, l)
+            )
+        self.main.ui.radio_contrast_nn.toggled.connect(
+            lambda checked: checked and ensure_nn_model_loaded_async(self.main)
         )
-        self.main.ui.radio_contrast_adjust.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.adjust_contrast, "линейная коррекция")
-        )
-        self.main.ui.radio_contrast_he.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.HE, "выравнивание гистограммы")
-        )
-        self.main.ui.radio_contrast_gamma.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.gamma, "гамма")
-        )
-        self.main.ui.radio_contrast_sigmoid.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.sigmoid, "сигмоида")
-        )
-        self.main.ui.radio_contrast_nn.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.nn, "нейросеть (классификация)")
-        )
-        self.main.ui.radio_contrast_nn.clicked.connect(self.main.ensure_nn_model_loaded_async)
-        self.main.ui.radio_contrast_auto_gamma.clicked.connect(
-            lambda: self._operator_contrast(ContrastImprovement.autoGamma, "автогамма")
-        )
+        if hasattr(self.main, "radio_contrast_zero_dce"):
+            self.main.radio_contrast_zero_dce.toggled.connect(
+                lambda checked: checked and ensure_zero_dce_loaded_async(self.main)
+            )
+        if hasattr(self.main, "radio_contrast_enlightengan"):
+            self.main.radio_contrast_enlightengan.toggled.connect(
+                lambda checked: checked and ensure_enlightengan_loaded_async(self.main)
+            )
         self.main.ui.radio_noise_none.clicked.connect(
             lambda: self._operator_noise(NoiseReduction.NotReduction, "без шумоподавления")
         )
@@ -538,9 +580,21 @@ class AppController:
         self.main.ui.button_gamma_info.clicked.connect(self._open_dialog_gamma_info)
         self.main.ui.button_sigmoid_info.clicked.connect(self._open_dialog_sigmoid_info)
         self.main.ui.button_nn_auto_info.clicked.connect(self._open_dialog_nn_info)
+        if hasattr(self.main, "button_zero_dce_info"):
+            self.main.button_zero_dce_info.clicked.connect(self._open_dialog_zero_dce_info)
+        if hasattr(self.main, "button_enlightengan_info"):
+            self.main.button_enlightengan_info.clicked.connect(self._open_dialog_enlightengan_info)
         self.main.ui.button_auto_gamma_info.clicked.connect(self._open_dialog_auto_gamma_info)
         self.main.ui.button_noise_median_info.clicked.connect(self._open_dialog_median_noise_info)
         self.main.ui.button_noise_fast_gaussian_info.clicked.connect(self._open_dialog_fast_gauss_info)
+        if hasattr(self.main, "radio_contrast_pipeline"):
+            self.main.radio_contrast_pipeline.toggled.connect(
+                lambda checked: checked and self._operator_contrast_pipeline()
+            )
+        if hasattr(self.main, "button_contrast_pipeline_info"):
+            self.main.button_contrast_pipeline_info.clicked.connect(
+                lambda: processing_dialogs.show_contrast_pipeline_dialog(self.main)
+            )
         self.main.tree.video_selected.connect(self._on_video_selected)
         self.main.ui.button_toggle_playback.clicked.connect(self.main.toggle_video_playback)
         self.main.ui.button_seek_backward.clicked.connect(self.main.video_seek_backward)
@@ -549,6 +603,11 @@ class AppController:
         self.main.ui.slider_playback_position.valueChanged.connect(self.main.set_video_position)
         self.main.ui.button_toggle_roi_display.toggled.connect(self._on_toggle_roi_display)
         self.main.videoPlayer.file_opened.connect(self._on_video_file_opened)
+
+    def _on_contrast_radio_toggled(self, checked: bool, method: ContrastImprovement, label: str):
+        if not checked:
+            return
+        self._operator_contrast(method, label)
 
     def _refresh_cameras_and_resolutions(self):
         logger.info("Оператор: обновление списка камер и разрешений")

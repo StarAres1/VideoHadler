@@ -47,6 +47,7 @@ class Camera(QObject):
 
         self.method_for_contrast = ContrastImprovement.NotImprove
         self.method_for_noise = NoiseReduction.NotReduction
+        self.contrast_pipeline = []
 
         self.prop = None
         self.roi_x = 0
@@ -62,6 +63,11 @@ class Camera(QObject):
 
     def set_method_for_contrast(self, method):
         self.method_for_contrast = method
+
+    def set_contrast_pipeline(self, methods):
+        self.contrast_pipeline = list(methods or [])
+        if self.video_handler:
+            self.video_handler.processor.config.contrast_pipeline = list(self.contrast_pipeline)
 
     def set_method_for_noise(self, method):
         self.method_for_noise = method
@@ -96,6 +102,7 @@ class Camera(QObject):
 
         self.video_handler = VideoHandler(self)
         self.video_handler.moveToThread(self.thread_show)
+        self.video_handler.processor.config.contrast_pipeline = list(self.contrast_pipeline)
 
         self.video_handler.paint_frame.connect(self.display_frame)
         self.thread_show.started.connect(self.video_handler.run)
@@ -326,6 +333,16 @@ class Camera(QObject):
     def set_nn_skip_frames(self, value):
         if self.video_handler:
             self.video_handler.processor.config.nn_skip_frames = int(value)
+
+    @pyqtSlot(float)
+    def set_zero_dce_strength(self, value):
+        if self.video_handler:
+            self.video_handler.processor.config.zero_dce_strength = float(value)
+
+    @pyqtSlot(float)
+    def set_enlightengan_strength(self, value):
+        if self.video_handler:
+            self.video_handler.processor.config.enlightengan_strength = float(value)
 
     @pyqtSlot(int)
     def set_median_ksize(self, value):

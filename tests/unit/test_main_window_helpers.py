@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from PyQt6.QtCore import QRect
 
+from app.core.Enums import ContrastImprovement
 from app.core.MainWindow import MainWindow
 
 
@@ -60,18 +61,6 @@ class TestApplyRoiFromMouseNegative:
         main_win._apply_roi_from_mouse_rect(QRect(0, 0, 20, 20))
 
 
-class TestAskUserConfirmation:
-    def test_returns_bool(self, main_win, monkeypatch):
-        from PyQt6 import QtWidgets
-
-        monkeypatch.setattr(
-            QtWidgets.QMessageBox,
-            "question",
-            lambda *a, **k: QtWidgets.QMessageBox.StandardButton.No,
-        )
-        assert main_win.ask_user_confirmation("t", "m") is False
-
-
 class TestCameraRecording:
     def test_start_recording_no_camera_shows_message(self, main_win, qtbot):
         main_win.camera = None
@@ -89,3 +78,39 @@ class TestCameraRecording:
         main_win.videoPlayer = None
         main_win.toggle_video_playback()
         qtbot.wait(50)
+
+
+class TestContrastSummaryText:
+    def test_build_applied_contrast_text_pipeline(self, main_win):
+        cam = MagicMock()
+        cam.method_for_contrast = ContrastImprovement.pipeline
+        cam.contrast_pipeline = [ContrastImprovement.gamma, ContrastImprovement.sigmoid]
+        proc = MagicMock()
+        proc.config = MagicMock()
+        proc.config.gamma = 1.6
+        proc.config.sigmoid_cutoff = 0.4
+        proc.config.sigmoid_gain = 10.0
+        cam.video_handler = MagicMock()
+        cam.video_handler.processor = proc
+        main_win.camera = cam
+
+        text = main_win._build_applied_contrast_text("camera")
+
+        assert "Режим: цепочка методов." in text
+        assert "1. Гамма-коррекция" in text
+        assert "2. Сигмоидная коррекция" in text
+
+
+class TestStatsPauseResume:
+    def test_pause_and_resume_file_preview(self, main_win):
+        vp = MagicMock()
+        vp.is_loaded.return_value = True
+        vp.is_playing.return_value = True
+        main_win.videoPlayer = vp
+
+        main_win._pause_preview_for_stats("file")
+        assert main_win._frame_stats_resume_file is True
+        vp.pause.assert_called_once()
+
+        main_win._resume_preview_after_stats()
+        vp.resume.assert_called_once()

@@ -281,6 +281,9 @@ class VideoPlayer(QObject):
         self._render_current_frame_async()
 
     def set_method_for_contrast(self, method): self.method_for_contrast = method; self.refresh_current_frame()
+    def set_contrast_pipeline(self, methods):
+        self.processor.config.contrast_pipeline = list(methods or [])
+        self.refresh_current_frame()
     def set_method_for_noise(self, method): self.method_for_noise = method; self.refresh_current_frame()
     def set_clipLimit_CLAHE(self, value): self.processor.config.clip_limit = float(value); self.refresh_current_frame()
     def set_titleGridSize_CLAHE(self, value): self.processor.config.tile_grid_size = int(value); self.refresh_current_frame()
@@ -293,6 +296,8 @@ class VideoPlayer(QObject):
     def set_auto_gamma_target_brightness(self, value): self.processor.config.auto_gamma_target_brightness = int(value); self.refresh_current_frame()
     def set_auto_gamma_color(self, value): self.processor.config.auto_gamma_color = bool(value); self.refresh_current_frame()
     def set_nn_skip_frames(self, value): self.processor.config.nn_skip_frames = int(value); self.refresh_current_frame()
+    def set_zero_dce_strength(self, value): self.processor.config.zero_dce_strength = float(value); self.refresh_current_frame()
+    def set_enlightengan_strength(self, value): self.processor.config.enlightengan_strength = float(value); self.refresh_current_frame()
     def set_median_ksize(self, value): self.processor.config.median_ksize = int(value); self.refresh_current_frame()
     def set_fast_gaussian_ksize(self, value): self.processor.config.fast_gaussian_ksize = int(value); self.refresh_current_frame()
     def set_fast_gaussian_sigma(self, value): self.processor.config.fast_gaussian_sigma = float(value); self.refresh_current_frame()

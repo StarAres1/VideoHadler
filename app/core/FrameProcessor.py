@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List
 
 import cv2
 import numpy as np
@@ -6,6 +7,8 @@ import numpy as np
 from app.core.ContrastImprover import ContrastImprover
 from app.core.Enums import ContrastImprovement, NoiseReduction
 from app.neural_network.NNContrastSelector import NN_SELECTOR
+from app.neural_network.enlightengan.enhancer import ENLIGHTENGAN_ENHANCER
+from app.neural_network.zero_dce.enhancer import ZERO_DCE_ENHANCER
 from app.core.QualityImprover import QualityImprover
 
 
@@ -25,7 +28,10 @@ class ProcessingConfig:
     fast_gaussian_ksize: int = 3
     fast_gaussian_sigma: float = 1.0
     nn_skip_frames: int = 0
+    zero_dce_strength: float = 1.0
+    enlightengan_strength: float = 1.0
     monochrome: bool = False
+    contrast_pipeline: List[ContrastImprovement] | None = None
 
 
 class FrameProcessor:
@@ -34,6 +40,59 @@ class FrameProcessor:
         self.nn_selector = NN_SELECTOR
         self._nn_skip_counter = 0
         self._nn_last_label = ""
+
+    def _apply_single_contrast(self, frame_rgb: np.ndarray, method: ContrastImprovement) -> np.ndarray:
+        if method == ContrastImprovement.CLAHE:
+            return ContrastImprover.CLAHE(
+                frame_rgb,
+                clipLimit=float(self.config.clip_limit),
+                titleGridSizeX=int(self.config.tile_grid_size),
+                titleGridSizeY=int(self.config.tile_grid_size),
+            )
+        if method == ContrastImprovement.adjust_contrast:
+            return ContrastImprover.adjust_contrast(
+                frame_rgb, alpha=float(self.config.alpha), beta=int(self.config.beta)
+            )
+        if method == ContrastImprovement.HE:
+            return ContrastImprover.HE(frame_rgb)
+        if method == ContrastImprovement.gamma:
+            return ContrastImprover.gamma_correction(frame_rgb, gamma=float(self.config.gamma))
+        if method == ContrastImprovement.autoGamma:
+            return ContrastImprover.auto_gamma(
+                frame_rgb,
+                target_brightness=int(self.config.auto_gamma_target_brightness),
+            )
+        if method == ContrastImprovement.sigmoid:
+            return ContrastImprover.sigmoid_correction(
+                frame_rgb,
+                cutoff=float(self.config.sigmoid_cutoff),
+                gain=float(self.config.sigmoid_gain),
+            )
+        if method == ContrastImprovement.pipeline:
+            return frame_rgb
+        if method == ContrastImprovement.nn:
+            # После успешного predict пропускаем nn_skip_frames кадров (без вызова сети), применяя последний ярлык.
+            # Счётчик не трогаем, если инференс не дал ярлык — иначе зря «замораживали» бы кадры со старым ярлыком.
+            if self._nn_skip_counter <= 0 or not self._nn_last_label:
+                predicted = self.nn_selector.predict_label(frame_rgb)
+                if predicted:
+                    self._nn_last_label = predicted
+                    self._nn_skip_counter = max(0, int(self.config.nn_skip_frames))
+            else:
+                self._nn_skip_counter -= 1
+            if self._nn_last_label:
+                return self.nn_selector.apply_label(frame_rgb, self._nn_last_label)
+        if method == ContrastImprovement.zero_dce:
+            return ZERO_DCE_ENHANCER.enhance(
+                frame_rgb,
+                strength=float(self.config.zero_dce_strength),
+            )
+        if method == ContrastImprovement.enlightengan:
+            return ENLIGHTENGAN_ENHANCER.enhance(
+                frame_rgb,
+                strength=float(self.config.enlightengan_strength),
+            )
+        return frame_rgb
 
     def process(
         self,
@@ -67,44 +126,12 @@ class FrameProcessor:
                 float(self.config.fast_gaussian_sigma),
             )
 
-        if contrast_method == ContrastImprovement.CLAHE:
-            frame_rgb = ContrastImprover.CLAHE(
-                frame_rgb,
-                clipLimit=float(self.config.clip_limit),
-                titleGridSizeX=int(self.config.tile_grid_size),
-                titleGridSizeY=int(self.config.tile_grid_size),
-            )
-        elif contrast_method == ContrastImprovement.adjust_contrast:
-            frame_rgb = ContrastImprover.adjust_contrast(
-                frame_rgb, alpha=float(self.config.alpha), beta=int(self.config.beta)
-            )
-        elif contrast_method == ContrastImprovement.HE:
-            frame_rgb = ContrastImprover.HE(frame_rgb)
-        elif contrast_method == ContrastImprovement.gamma:
-            frame_rgb = ContrastImprover.gamma_correction(frame_rgb, gamma=float(self.config.gamma))
-        elif contrast_method == ContrastImprovement.autoGamma:
-            frame_rgb = ContrastImprover.auto_gamma(
-                frame_rgb,
-                target_brightness=int(self.config.auto_gamma_target_brightness),
-            )
-        elif contrast_method == ContrastImprovement.sigmoid:
-            frame_rgb = ContrastImprover.sigmoid_correction(
-                frame_rgb,
-                cutoff=float(self.config.sigmoid_cutoff),
-                gain=float(self.config.sigmoid_gain),
-            )
-        elif contrast_method == ContrastImprovement.nn:
-            # После успешного predict пропускаем nn_skip_frames кадров (без вызова сети), применяя последний ярлык.
-            # Счётчик не трогаем, если инференс не дал ярлык — иначе зря «замораживали» бы кадры со старым ярлыком.
-            if self._nn_skip_counter <= 0 or not self._nn_last_label:
-                predicted = self.nn_selector.predict_label(frame_rgb)
-                if predicted:
-                    self._nn_last_label = predicted
-                    self._nn_skip_counter = max(0, int(self.config.nn_skip_frames))
-            else:
-                self._nn_skip_counter -= 1
-            if self._nn_last_label:
-                frame_rgb = self.nn_selector.apply_label(frame_rgb, self._nn_last_label)
+        pipeline = list(self.config.contrast_pipeline or [])
+        if contrast_method == ContrastImprovement.pipeline and pipeline:
+            for method in pipeline:
+                frame_rgb = self._apply_single_contrast(frame_rgb, method)
+        else:
+            frame_rgb = self._apply_single_contrast(frame_rgb, contrast_method)
 
         if self.config.monochrome:
             gray = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)
