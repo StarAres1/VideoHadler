@@ -199,46 +199,6 @@ def show_zero_dce_info(host, apply_callback: Callable[[str, object], None]) -> N
     host.dialog_zero_dce = dialog
 
 
-def show_enlightengan_info(host, apply_callback: Callable[[str, object], None]) -> None:
-    if not _can_show(host):
-        return
-    dialog = QtWidgets.QDialog(host)
-    dialog.setWindowTitle("Параметры EnlightenGAN")
-    layout = QtWidgets.QVBoxLayout(dialog)
-    label = QtWidgets.QLabel("Сила эффекта (0.0 - исходный кадр, 1.0 - полный EnlightenGAN)")
-    layout.addWidget(label)
-
-    row = QtWidgets.QHBoxLayout()
-    slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal, dialog)
-    slider.setRange(0, 100)
-    spin = QtWidgets.QDoubleSpinBox(dialog)
-    spin.setDecimals(2)
-    spin.setSingleStep(0.01)
-    spin.setRange(0.0, 1.0)
-    row.addWidget(slider)
-    row.addWidget(spin)
-    layout.addLayout(row)
-
-    current_strength = 1.0
-    if host.camera and getattr(host.camera, "flag_capture", False) and getattr(host.camera, "video_handler", None):
-        current_strength = float(getattr(host.camera.video_handler.processor.config, "enlightengan_strength", 1.0))
-    elif host.videoPlayer and host.videoPlayer.is_loaded():
-        current_strength = float(getattr(host.videoPlayer.processor.config, "enlightengan_strength", 1.0))
-    current_strength = max(0.0, min(1.0, current_strength))
-
-    host.sl_sp_enlightengan_strength = SpinBox_Slider(
-        slider,
-        spin,
-        lambda value: apply_callback("set_enlightengan_strength", value),
-        int(round(current_strength * 100)),
-        current_strength,
-        lambda v: int(v * 100),
-        lambda v: float(v / 100.0),
-    )
-    dialog.show()
-    host.dialog_enlightengan = dialog
-
-
 def show_noise_median_info(host, apply_callback: Callable[[str, object], None]) -> None:
     if not _can_show(host):
         return
@@ -301,7 +261,6 @@ def show_contrast_pipeline_dialog(host) -> None:
         ("Автогамма", ContrastImprovement.autoGamma),
         ("Автоподбор нейросетью", ContrastImprovement.nn),
         ("Zero-DCE", ContrastImprovement.zero_dce),
-        ("EnlightenGAN", ContrastImprovement.enlightengan),
     ]
     title_to_method = {title: method for title, method in options}
     method_to_title = {method: title for title, method in options}

@@ -3,6 +3,7 @@ from PyQt6.QtGui import QImage, QPixmap
 import cv2
 import logging
 import time
+import numpy as np
 from app.core.FrameProcessor import FrameProcessor
 
 logger = logging.getLogger(__name__)
@@ -59,8 +60,9 @@ class VideoHandler(QObject):
 
                 # кадр без коррекции для записи
                 raw_rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                raw_rgb_frame = np.ascontiguousarray(raw_rgb_frame)
                 raw_q_image = QImage(
-                    raw_rgb_frame.data,
+                    raw_rgb_frame.tobytes(),
                     self.camera.width,
                     self.camera.height,
                     self.camera.channel * self.camera.width,
@@ -97,9 +99,16 @@ class VideoHandler(QObject):
                 )
                 self.camera.last_preview_after_rgb = frame.copy()
 
+                frame = np.ascontiguousarray(frame)
                 bytes_per_line = self.camera.channel * fw
 
-                q_image = QImage(frame.data, fw, fh, bytes_per_line, QImage.Format.Format_RGB888)
+                q_image = QImage(
+                    frame.tobytes(),
+                    fw,
+                    fh,
+                    bytes_per_line,
+                    QImage.Format.Format_RGB888
+                )
 
                 pixmap = QPixmap.fromImage(q_image)
 

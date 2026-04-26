@@ -133,7 +133,15 @@ def _to_qpixmap(canvas_rgb: np.ndarray) -> QPixmap:
     return QPixmap.fromImage(qimg)
 
 
-def _draw_axes_and_labels(canvas: np.ndarray, left: int, top: int, right: int, bottom: int, y_max: float) -> None:
+def _draw_axes_and_labels(
+    canvas: np.ndarray,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+    y_max: float,
+    y_as_percent: bool = False,
+) -> None:
     cv2.rectangle(canvas, (left, top), (right, bottom), (0, 0, 0), 1)
     for x_val in (0, 64, 128, 192, 255):
         x = left + int((x_val / 255.0) * (right - left))
@@ -142,8 +150,11 @@ def _draw_axes_and_labels(canvas: np.ndarray, left: int, top: int, right: int, b
     for t in (0.0, 0.25, 0.5, 0.75, 1.0):
         y = bottom - int(t * (bottom - top))
         cv2.line(canvas, (left - 4, y), (left, y), (0, 0, 0), 1)
-        val = int(round(t * y_max))
-        cv2.putText(canvas, str(val), (2, y + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1, cv2.LINE_AA)
+        if y_as_percent:
+            label = f"{int(round(t * 100))}%"
+        else:
+            label = str(int(round(t * y_max)))
+        cv2.putText(canvas, label, (2, y + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 1, cv2.LINE_AA)
 
 
 def histogram_pixmaps_l_pair(image_before_l: np.ndarray, image_after_l: np.ndarray, width: int = 460, height: int = 260, same_scale: bool = False) -> tuple[QPixmap, QPixmap]:
@@ -183,7 +194,7 @@ def cumulative_histogram_pixmaps_l_pair(image_before_l: np.ndarray, image_after_
 
     def render(cdf: np.ndarray) -> QPixmap:
         canvas = np.full((height, width, 3), 255, dtype=np.uint8)
-        _draw_axes_and_labels(canvas, left, top, right, bottom, 1.0)
+        _draw_axes_and_labels(canvas, left, top, right, bottom, 1.0, y_as_percent=True)
         prev = None
         for i, val in enumerate(cdf):
             x = left + int((i / 255.0) * plot_w)

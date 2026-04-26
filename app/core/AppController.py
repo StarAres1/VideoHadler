@@ -8,7 +8,6 @@ from app.core.MainWindow import MainWindow
 from app.core.custom_widgets.SpinBox_Slider import SpinBox_Slider
 from app.core.VideoPlayer import VideoPlayer
 from app.core.ui_panels import processing_dialogs
-from app.neural_network.enlightengan_loader_ui import ensure_enlightengan_loaded_async
 from app.neural_network.nn_loader_ui import ensure_nn_model_loaded_async
 from app.neural_network.zero_dce_loader_ui import ensure_zero_dce_loaded_async
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
@@ -167,10 +166,6 @@ class AppController:
     def _open_dialog_zero_dce_info(self) -> None:
         logger.info("Оператор: диалог Zero-DCE")
         processing_dialogs.show_zero_dce_info(self.main, self._apply_to_active_sources)
-
-    def _open_dialog_enlightengan_info(self) -> None:
-        logger.info("Оператор: диалог EnlightenGAN")
-        processing_dialogs.show_enlightengan_info(self.main, self._apply_to_active_sources)
 
     def _open_dialog_auto_gamma_info(self) -> None:
         logger.info("Оператор: диалог автогаммы")
@@ -546,10 +541,6 @@ class AppController:
             contrast_bindings += (
                 (self.main.radio_contrast_zero_dce, ContrastImprovement.zero_dce, "Zero-DCE"),
             )
-        if hasattr(self.main, "radio_contrast_enlightengan"):
-            contrast_bindings += (
-                (self.main.radio_contrast_enlightengan, ContrastImprovement.enlightengan, "EnlightenGAN"),
-            )
         for radio, method, label in contrast_bindings:
             radio.toggled.connect(
                 lambda checked, m=method, l=label: self._on_contrast_radio_toggled(checked, m, l)
@@ -560,10 +551,6 @@ class AppController:
         if hasattr(self.main, "radio_contrast_zero_dce"):
             self.main.radio_contrast_zero_dce.toggled.connect(
                 lambda checked: checked and ensure_zero_dce_loaded_async(self.main)
-            )
-        if hasattr(self.main, "radio_contrast_enlightengan"):
-            self.main.radio_contrast_enlightengan.toggled.connect(
-                lambda checked: checked and ensure_enlightengan_loaded_async(self.main)
             )
         self.main.ui.radio_noise_none.clicked.connect(
             lambda: self._operator_noise(NoiseReduction.NotReduction, "без шумоподавления")
@@ -582,8 +569,6 @@ class AppController:
         self.main.ui.button_nn_auto_info.clicked.connect(self._open_dialog_nn_info)
         if hasattr(self.main, "button_zero_dce_info"):
             self.main.button_zero_dce_info.clicked.connect(self._open_dialog_zero_dce_info)
-        if hasattr(self.main, "button_enlightengan_info"):
-            self.main.button_enlightengan_info.clicked.connect(self._open_dialog_enlightengan_info)
         self.main.ui.button_auto_gamma_info.clicked.connect(self._open_dialog_auto_gamma_info)
         self.main.ui.button_noise_median_info.clicked.connect(self._open_dialog_median_noise_info)
         self.main.ui.button_noise_fast_gaussian_info.clicked.connect(self._open_dialog_fast_gauss_info)

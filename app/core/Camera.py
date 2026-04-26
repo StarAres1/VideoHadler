@@ -339,11 +339,6 @@ class Camera(QObject):
         if self.video_handler:
             self.video_handler.processor.config.zero_dce_strength = float(value)
 
-    @pyqtSlot(float)
-    def set_enlightengan_strength(self, value):
-        if self.video_handler:
-            self.video_handler.processor.config.enlightengan_strength = float(value)
-
     @pyqtSlot(int)
     def set_median_ksize(self, value):
         if self.video_handler:

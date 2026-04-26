@@ -7,7 +7,6 @@ import numpy as np
 from app.core.ContrastImprover import ContrastImprover
 from app.core.Enums import ContrastImprovement, NoiseReduction
 from app.neural_network.NNContrastSelector import NN_SELECTOR
-from app.neural_network.enlightengan.enhancer import ENLIGHTENGAN_ENHANCER
 from app.neural_network.zero_dce.enhancer import ZERO_DCE_ENHANCER
 from app.core.QualityImprover import QualityImprover
 
@@ -29,7 +28,6 @@ class ProcessingConfig:
     fast_gaussian_sigma: float = 1.0
     nn_skip_frames: int = 0
     zero_dce_strength: float = 1.0
-    enlightengan_strength: float = 1.0
     monochrome: bool = False
     contrast_pipeline: List[ContrastImprovement] | None = None
 
@@ -86,11 +84,6 @@ class FrameProcessor:
             return ZERO_DCE_ENHANCER.enhance(
                 frame_rgb,
                 strength=float(self.config.zero_dce_strength),
-            )
-        if method == ContrastImprovement.enlightengan:
-            return ENLIGHTENGAN_ENHANCER.enhance(
-                frame_rgb,
-                strength=float(self.config.enlightengan_strength),
             )
         return frame_rgb
 

@@ -12,7 +12,6 @@ class ContrastImprovement(Enum):
     nn = 7
     pipeline = 8
     zero_dce = 9
-    enlightengan = 10
 
 
 class NoiseReduction(Enum):

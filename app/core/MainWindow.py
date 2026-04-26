@@ -42,11 +42,6 @@ class MainWindow(QMainWindow):
         self.zero_dce_progress_dialog = None
         self.zero_dce_progress_label = None
         self.zero_dce_progress_bar = None
-        self.enlightengan_loader_thread = None
-        self.enlightengan_loader_worker = None
-        self.enlightengan_progress_dialog = None
-        self.enlightengan_progress_label = None
-        self.enlightengan_progress_bar = None
         self._iqa_calc = IqaMetricsCalculator()
         self._frame_stats_dialog = None
         self._frame_stats_resume_file = False
@@ -84,11 +79,6 @@ class MainWindow(QMainWindow):
         self.button_zero_dce_info = QtWidgets.QToolButton(self.ui.contrast_group)
         self.button_zero_dce_info.setText("...")
         self.ui.main_layout.addWidget(self.button_zero_dce_info, 11, 1, 1, 1)
-        self.radio_contrast_enlightengan = QtWidgets.QRadioButton("EnlightenGAN", self.ui.contrast_group)
-        self.ui.main_layout.addWidget(self.radio_contrast_enlightengan, 12, 0, 1, 1)
-        self.button_enlightengan_info = QtWidgets.QToolButton(self.ui.contrast_group)
-        self.button_enlightengan_info.setText("...")
-        self.ui.main_layout.addWidget(self.button_enlightengan_info, 12, 1, 1, 1)
         self.ui.video_frame_label.installEventFilter(self)
         self.ui.video_frame_label.setMouseTracking(True)
         self._set_processing_blocks_enabled(False)
@@ -107,7 +97,6 @@ class MainWindow(QMainWindow):
             ContrastImprovement.autoGamma: "Параметры автогаммы",
             ContrastImprovement.nn: "Параметры нейросетевого метода",
             ContrastImprovement.zero_dce: "Параметры Zero-DCE",
-            ContrastImprovement.enlightengan: "Параметры EnlightenGAN",
         }
         return titles.get(method, "Параметры метода")
 
@@ -126,8 +115,6 @@ class MainWindow(QMainWindow):
             processing_dialogs.show_nn_auto_info(self, self._apply_to_active_sources)
         elif method == ContrastImprovement.zero_dce:
             processing_dialogs.show_zero_dce_info(self, self._apply_to_active_sources)
-        elif method == ContrastImprovement.enlightengan:
-            processing_dialogs.show_enlightengan_info(self, self._apply_to_active_sources)
 
     def _init_resolution_controls(self):
         self.resolution_group = QtWidgets.QGroupBox("Разрешение камеры", self.ui.group_camera_capture)
@@ -589,7 +576,6 @@ class MainWindow(QMainWindow):
             ContrastImprovement.nn: "Автоподбор нейросетью",
             ContrastImprovement.pipeline: "Цепочка методов",
             ContrastImprovement.zero_dce: "Zero-DCE",
-            ContrastImprovement.enlightengan: "EnlightenGAN",
         }
         return mapping.get(method, str(method))
 
@@ -611,8 +597,6 @@ class MainWindow(QMainWindow):
             return f"{name} (skip_frames={cfg.nn_skip_frames}, выбранный метод={nn_label})"
         if method == ContrastImprovement.zero_dce:
             return f"{name} (strength={cfg.zero_dce_strength:.2f})"
-        if method == ContrastImprovement.enlightengan:
-            return f"{name} (strength={cfg.enlightengan_strength:.2f})"
         return name
 
     def _build_applied_contrast_text(self, source: str) -> str:
