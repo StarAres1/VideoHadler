@@ -173,3 +173,29 @@ class TestFrameProcessorProcess:
                 rgb_frame, 30, 20, 0, 0, 30, 20, ContrastImprovement.nn, NoiseReduction.NotReduction
             )
         assert mock_nn.predict_label.call_count == 4
+
+def test_contrast_pipeline_executes_chain(rgb_frame):
+    """Contrast pipeline should apply methods in given order."""
+    fp = FrameProcessor()
+    config = fp.config
+    config.contrast_pipeline = [ContrastImprovement.gamma, ContrastImprovement.sigmoid]
+    config.gamma = 1.2
+    config.sigmoid_cutoff = 0.4
+    config.sigmoid_gain = 8.0
+
+    out = fp.process(
+        rgb_frame, 30, 20, 0, 0, 30, 20,
+        ContrastImprovement.pipeline,
+        NoiseReduction.NotReduction
+    )
+    assert out.shape == (20, 30, 3)
+
+def test_contrast_pipeline_empty_returns_original(rgb_frame):
+    fp = FrameProcessor()
+    fp.config.contrast_pipeline = []
+    out = fp.process(
+        rgb_frame, 30, 20, 0, 0, 30, 20,
+        ContrastImprovement.pipeline,
+        NoiseReduction.NotReduction
+    )
+    np.testing.assert_array_equal(out, rgb_frame)

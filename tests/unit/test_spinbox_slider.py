@@ -35,3 +35,12 @@ class TestSpinBoxSlider:
         SpinBox_Slider(slider, spin, cb, slider_value=3, spinbox_value=30)
         assert slider.setValue.call_count >= 1
         assert spin.setValue.call_count >= 1
+
+def test_set_value_with_func():
+    slider = MagicMock()
+    spin = MagicMock()
+    func = MagicMock(return_value=42)
+    sbs = SpinBox_Slider(slider, spin, lambda x: None, slider_value=5, spinbox_value=10)
+    sbs.set_value(7, spin, func)
+    func.assert_called_with(7)
+    spin.setValue.assert_called_with(42)

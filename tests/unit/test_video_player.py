@@ -5,9 +5,11 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 from PyQt6.QtWidgets import QLabel
+from pytestqt import qtbot
 
 from app.core.Enums import ContrastImprovement, NoiseReduction
 from app.core.VideoPlayer import VideoPlayer
+import os
 
 
 @pytest.fixture
@@ -94,3 +96,27 @@ class TestVideoPlayerBasics:
         assert vp.method_for_contrast == ContrastImprovement.CLAHE
         vp.set_method_for_noise(NoiseReduction.FastGaussian)
         assert vp.method_for_noise == NoiseReduction.FastGaussian
+
+# ========== ADDITIONS to test_video_player.py ==========
+
+def test_render_current_frame_async_emits_signal(qtbot, label_record_format, video_file_mp4):
+    vp = VideoPlayer(label_record_format)
+    vp.play(video_file_mp4)
+    with qtbot.waitSignal(vp.frame_ready, timeout=1000):
+        vp.update_frame()   # reads one frame and starts async render
+    vp.stop()
+
+def test_stop_clears_state(label_record_format, video_file_mp4):
+    vp = VideoPlayer(label_record_format)
+    vp.play(video_file_mp4)
+    vp.stop()
+    assert vp.current_frame is None
+    assert vp.raw_frame is None
+    assert vp.is_loaded() is False
+    assert vp.is_playing() is False
+    assert vp.show_roi_content is False
+
+def test_refresh_current_frame_when_not_loaded(label_record_format):
+    vp = VideoPlayer(label_record_format)
+    vp.refresh_current_frame()   # should not crash
+    assert vp.current_frame is None
